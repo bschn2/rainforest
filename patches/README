@@ -1,0 +1,8 @@
+These are patches adding support for the Rainforest algorithm to existing products :
+
+* smhasher-rf256.diff : for SMHasher, to validate the algorithm's robustness
+* cpuminer-multi-134-rf256.diff : this is for version 1.3.4 of this popular CPU miner
+* sgminer-gm-add-rainforest+precalc.diff : this is for the latest version of this GPU miner
+* yiimp-rainforest.diff : this is for the latest version of this popular server
+
+Support for Android wallets would be appreciated.
