@@ -186,16 +186,16 @@ void aes2r_encrypt(uint8_t * state, uint8_t * key) {
 
 #else
     /* first round of the algorithm */
-    add_round_key(state, (void*)&key_schedule[0]);
+    add_round_key(state, (uint8_t*)&key_schedule[0]);
     sub_bytes(state);
     shift_rows(state);
     mix_columns(state);
-    add_round_key(state, (void*)&key_schedule[4]);
+    add_round_key(state, (uint8_t*)&key_schedule[4]);
 
     /* final round of the algorithm */
     sub_bytes(state);
     shift_rows(state);
-    add_round_key(state, (void*)&key_schedule[8]);
+    add_round_key(state, (uint8_t*)&key_schedule[8]);
 
 #endif
 }

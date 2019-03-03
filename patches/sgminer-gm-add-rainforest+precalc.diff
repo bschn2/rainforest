@@ -1,9 +1,3 @@
-commit 0fe72601a43397a6df2ab2abfcabfa7ea5a65a2a
-Author: Mike Murdock <42321661+MikeMurdo@users.noreply.github.com>
-Date:   Sun Aug 12 19:37:39 2018 +0200
-
-    add rainforest algo
-
 diff --git a/Makefile.am b/Makefile.am
 index 69922b3..44c3528 100644
 --- a/Makefile.am
@@ -120,10 +114,10 @@ index 54e2308..427da4a 100644
    ALGO_BLAKECOIN,
 diff --git a/algorithm/rainforest.c b/algorithm/rainforest.c
 new file mode 100644
-index 0000000..b65b67e
+index 0000000..d0cf25c
 --- /dev/null
 +++ b/algorithm/rainforest.c
-@@ -0,0 +1,806 @@
+@@ -0,0 +1,808 @@
 +#include "config.h"
 +#include "miner.h"
 +
@@ -305,16 +299,16 @@ index 0000000..b65b67e
 +
 +#else
 +    /* first round of the algorithm */
-+    add_round_key(state, (void*)&key_schedule[0]);
++    add_round_key(state, (uint8_t*)&key_schedule[0]);
 +    sub_bytes(state);
 +    shift_rows(state);
 +    mix_columns(state);
-+    add_round_key(state, (void*)&key_schedule[4]);
++    add_round_key(state, (uint8_t*)&key_schedule[4]);
 +
 +    /* final round of the algorithm */
 +    sub_bytes(state);
 +    shift_rows(state);
-+    add_round_key(state, (void*)&key_schedule[8]);
++    add_round_key(state, (uint8_t*)&key_schedule[8]);
 +
 +#endif
 +}
@@ -631,7 +625,7 @@ index 0000000..b65b67e
 +}
 +
 +// write (_x_,_y_) at cell _cell_ for offset _ofs_
-+static inline void rf_w128(uint64_t *cell, ulong ofs, uint64_t x, uint64_t y) {
++static inline void rf_w128(uint64_t *cell, size_t ofs, uint64_t x, uint64_t y) {
 +#if defined(__ARM_ARCH_8A) || defined(__AARCH64EL__)
 +  // 128 bit at once is faster when exactly two parallelizable instructions are
 +  // used between two calls to keep the pipe full.
@@ -848,18 +842,20 @@ index 0000000..b65b67e
 +
 +// update the hash context _ctx_ with _len_ bytes from message _msg_
 +static void rf256_update(rf256_ctx_t *ctx, const void *msg, size_t len) {
++  const uint8_t *msg8 = (uint8_t *)msg;
++
 +  while (len > 0) {
 +#ifdef RF_UNALIGNED_LE32
 +    if (!(ctx->len&3) && len>=4) {
-+      ctx->word=*(uint32_t *)msg;
++      ctx->word=*(uint32_t *)msg8;
 +      ctx->len+=4;
 +      rf256_one_round(ctx);
-+      msg+=4;
++      msg8+=4;
 +      len-=4;
 +      continue;
 +    }
 +#endif
-+    ctx->word|=((uint32_t)*(uint8_t *)msg++)<<(8*(ctx->len++&3));
++    ctx->word|=((uint32_t)*msg++)<<(8*(ctx->len++&3));
 +    len--;
 +    if (!(ctx->len&3))
 +      rf256_one_round(ctx);
