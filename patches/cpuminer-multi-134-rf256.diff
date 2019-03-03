@@ -1,15 +1,21 @@
-commit 0098492787dea4888c4fa179a16d0c74a2055e2b
-Author: Mike Murdock <42321661+MikeMurdo@users.noreply.github.com>
-Date:   Sun Aug 12 19:32:18 2018 +0200
-
-    add rainforest algo
-
+diff --git a/Makefile.am b/Makefile.am
+index 8ce8715..0d389dd 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -85,6 +85,7 @@ cpuminer_SOURCES = \
+   algo/nist5.c \
+   algo/pluck.c \
+   algo/qubit.c \
++  algo/rainforest.c \
+   algo/scrypt.c \
+   algo/scrypt-jane.c \
+   algo/sha2.c \
 diff --git a/algo/rainforest.c b/algo/rainforest.c
 new file mode 100644
-index 0000000..4a36346
+index 0000000..c5a17cd
 --- /dev/null
 +++ b/algo/rainforest.c
-@@ -0,0 +1,855 @@
+@@ -0,0 +1,857 @@
 +// RainForest hash algorithm
 +// Author: Bill Schneider
 +// Date: Feb 13th, 2018
@@ -225,16 +231,16 @@ index 0000000..4a36346
 +
 +#else
 +    /* first round of the algorithm */
-+    add_round_key(state, (void*)&key_schedule[0]);
++    add_round_key(state, (uint8_t*)&key_schedule[0]);
 +    sub_bytes(state);
 +    shift_rows(state);
 +    mix_columns(state);
-+    add_round_key(state, (void*)&key_schedule[4]);
++    add_round_key(state, (uint8_t*)&key_schedule[4]);
 +
 +    /* final round of the algorithm */
 +    sub_bytes(state);
 +    shift_rows(state);
-+    add_round_key(state, (void*)&key_schedule[8]);
++    add_round_key(state, (uint8_t*)&key_schedule[8]);
 +
 +#endif
 +}
@@ -551,7 +557,7 @@ index 0000000..4a36346
 +}
 +
 +// write (_x_,_y_) at cell _cell_ for offset _ofs_
-+static inline void rf_w128(uint64_t *cell, ulong ofs, uint64_t x, uint64_t y) {
++static inline void rf_w128(uint64_t *cell, size_t ofs, uint64_t x, uint64_t y) {
 +#if defined(__ARM_ARCH_8A) || defined(__AARCH64EL__)
 +  // 128 bit at once is faster when exactly two parallelizable instructions are
 +  // used between two calls to keep the pipe full.
@@ -768,18 +774,20 @@ index 0000000..4a36346
 +
 +// update the hash context _ctx_ with _len_ bytes from message _msg_
 +static void rf256_update(rf256_ctx_t *ctx, const void *msg, size_t len) {
++  const uint8_t *msg8 = (uint8_t *)msg;
++
 +  while (len > 0) {
 +#ifdef RF_UNALIGNED_LE32
 +    if (!(ctx->len&3) && len>=4) {
-+      ctx->word=*(uint32_t *)msg;
++      ctx->word=*(uint32_t *)msg8;
 +      ctx->len+=4;
 +      rf256_one_round(ctx);
-+      msg+=4;
++      msg8+=4;
 +      len-=4;
 +      continue;
 +    }
 +#endif
-+    ctx->word|=((uint32_t)*(uint8_t *)msg++)<<(8*(ctx->len++&3));
++    ctx->word|=((uint32_t)*msg++)<<(8*(ctx->len++&3));
 +    len--;
 +    if (!(ctx->len&3))
 +      rf256_one_round(ctx);
@@ -865,3 +873,53 @@ index 0000000..4a36346
 +	*hashes_done = pdata[19] - first_nonce + 1;
 +	return 0;
 +}
+diff --git a/cpu-miner.c b/cpu-miner.c
+index 7bdc175..8c538e9 100644
+--- a/cpu-miner.c
++++ b/cpu-miner.c
+@@ -109,6 +109,7 @@ enum algos {
+ 	ALGO_PHI2,
+ 	ALGO_PLUCK,       /* Pluck (Supcoin) */
+ 	ALGO_QUBIT,       /* Qubit */
++	ALGO_RAINFOREST,  /* RainForest */
+ 	ALGO_SCRYPT,      /* scrypt */
+ 	ALGO_SCRYPTJANE,  /* Chacha */
+ 	ALGO_SHAVITE3,    /* Shavite3 */
+@@ -172,6 +173,7 @@ static const char *algo_names[] = {
+ 	"phi2",
+ 	"pluck",
+ 	"qubit",
++	"rainforest",
+ 	"scrypt",
+ 	"scrypt-jane",
+ 	"shavite3",
+@@ -334,6 +336,7 @@ Options:\n\
+                           phi2         LUX newer algo\n\
+                           quark        Quark\n\
+                           qubit        Qubit\n\
++                          rainforest   RainForest (256)\n\
+                           scrypt       scrypt(1024, 1, 1) (default)\n\
+                           scrypt:N     scrypt(N, 1, 1)\n\
+                           scrypt-jane:N (with N factor from 4 to 30)\n\
+@@ -2332,6 +2335,9 @@ static void *miner_thread(void *userdata)
+ 		case ALGO_QUBIT:
+ 			rc = scanhash_qubit(thr_id, &work, max_nonce, &hashes_done);
+ 			break;
++		case ALGO_RAINFOREST:
++			rc = scanhash_rf256(thr_id, &work, max_nonce, &hashes_done);
++			break;
+ 		case ALGO_SCRYPT:
+ 			rc = scanhash_scrypt(thr_id, &work, max_nonce, &hashes_done, scratchbuf, opt_scrypt_n);
+ 			break;
+diff --git a/miner.h b/miner.h
+index 8a6aec2..9ecbb88 100644
+--- a/miner.h
++++ b/miner.h
+@@ -231,6 +231,7 @@ int scanhash_pluck(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *
+ int scanhash_quark(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *hashes_done);
+ void init_quarkhash_contexts();
+ int scanhash_qubit(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *hashes_done);
++int scanhash_rf256(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *hashes_done);
+ int scanhash_sha256d(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *hashes_done);
+ unsigned char *scrypt_buffer_alloc(int N);
+ int scanhash_scrypt(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *hashes_done,
