@@ -157,7 +157,7 @@ void aes2r_encrypt(uint8_t * state, uint8_t * key) {
 
 // Use -march=armv8-a+crypto+crc to get this one
 #if defined(__aarch64__) && defined(__ARM_FEATURE_CRYPTO)
-    asm volatile(
+    __asm__ volatile(
         "ld1   {v0.16b},[%0]        \n"
 	"ld1   {v1.16b,v2.16b,v3.16b},[%1]  \n"
 	"aese  v0.16b,v1.16b        \n" // round1: add_round_key,sub_bytes,shift_rows
@@ -171,7 +171,7 @@ void aes2r_encrypt(uint8_t * state, uint8_t * key) {
 
 // Use -maes to get this one
 #elif defined(__x86_64__) && defined(__AES__)
-    asm volatile(
+    __asm__ volatile(
         "movups (%0),  %%xmm0     \n"
 	"movups (%1),  %%xmm1     \n"
 	"pxor   %%xmm1,%%xmm0     \n" // add_round_key(state, key_schedule)
