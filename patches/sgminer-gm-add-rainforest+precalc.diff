@@ -855,7 +855,7 @@ index 0000000..d0cf25c
 +      continue;
 +    }
 +#endif
-+    ctx->word|=((uint32_t)*msg++)<<(8*(ctx->len++&3));
++    ctx->word|=((uint32_t)*msg8++)<<(8*(ctx->len++&3));
 +    len--;
 +    if (!(ctx->len&3))
 +      rf256_one_round(ctx);
