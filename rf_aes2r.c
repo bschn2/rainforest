@@ -35,7 +35,7 @@ static uint8_t SBOX[256] = {
 /*--- The parts below are not used when crypto extensions are available ---*/
 /* Use -march=armv8-a+crypto on ARMv8 to use crypto extensions */
 /* Use -maes on x86_64 to use AES-NI */
-#if (!defined(__aarch64__) || !defined(__ARM_FEATURE_CRYPTO)) && (!defined(__x86_64__) || !defined(__AES__))
+#if defined(RF_NOASM) || (!defined(__aarch64__) || !defined(__ARM_FEATURE_CRYPTO)) && (!defined(__x86_64__) || !defined(__AES__))
 
 /* shifts to do for shift_rows step */
 static uint8_t shifts[16] = {
@@ -162,7 +162,7 @@ void aes2r_encrypt(uint8_t * state, uint8_t * key)
 	t = key_schedule[11] = key_schedule[7] ^ t;
 
 	// Use -march=armv8-a+crypto+crc to get this one
-#if defined(__aarch64__) && defined(__ARM_FEATURE_CRYPTO)
+#if !defined(RF_NOASM) && defined(__aarch64__) && defined(__ARM_FEATURE_CRYPTO)
 	__asm__ volatile(
 		"ld1   {v0.16b},[%0]        \n"
 		"ld1   {v1.16b,v2.16b,v3.16b},[%1]  \n"
@@ -176,7 +176,7 @@ void aes2r_encrypt(uint8_t * state, uint8_t * key)
 		: "v0", "v1", "v2", "v3", "cc", "memory");
 
 	// Use -maes to get this one
-#elif defined(__x86_64__) && defined(__AES__)
+#elif !defined(RF_NOASM) && defined(__x86_64__) && defined(__AES__)
 	__asm__ volatile(
 		"movups (%0),  %%xmm0     \n"
 		"movups (%1),  %%xmm1     \n"
