@@ -69,11 +69,11 @@ typedef union {
 } rf_hash256_t;
 
 typedef struct RF_ALIGN(16) rf_ctx {
-  uint64_t rambox[RAMBOX_SIZE];
-  rf_hash256_t hash;
-  uint32_t crc;
   uint32_t word;  // LE pending message
   uint32_t len;   // total message length
+  uint32_t crc;
+  rf_hash256_t RF_ALIGN(32) hash;
+  uint64_t RF_ALIGN(64) rambox[RAMBOX_SIZE];
 } rf256_ctx_t;
 
 void rf256_init(rf256_ctx_t *ctx);
