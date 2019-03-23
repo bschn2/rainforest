@@ -35,12 +35,18 @@ int main(int argc, char **argv)
 	unsigned int loops;
 	uint8_t msg[80];
 	unsigned char md[32];
+	void *rambox;
+
+	rambox = malloc(RF_RAMBOX_SIZE * 8);
+	if (rambox == NULL)
+		exit(1);
+	rf_raminit(rambox);
 
 	if (argc>1) {
-		rf256_hash(md, (uint8_t*)argv[1], strlen(argv[1]), NULL);
+		rf256_hash(md, (uint8_t*)argv[1], strlen(argv[1]), rambox);
 		print256(md, "1step(argv1)   ");
 
-		rf256_hash(md, (uint8_t*)argv[1], strlen(argv[1])+1, NULL);
+		rf256_hash(md, (uint8_t*)argv[1], strlen(argv[1])+1, rambox);
 		print256(md, "1step(argv1+\\0)");
 		return 0;
 	}
@@ -51,7 +57,7 @@ int main(int argc, char **argv)
 	for (loops=0; loops<100000/*0*/; loops++) {
 		if (!(loops&0x3ffff))
 			printf("%u\n", loops);
-		rf256_hash(md, msg, sizeof(msg), NULL);
+		rf256_hash(md, msg, sizeof(msg), rambox);
 		memcpy(msg, md, 32);
 	}
 	printf("%u\n", loops);
