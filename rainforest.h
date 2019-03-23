@@ -37,14 +37,25 @@
 #include <stdint.h>
 
 #ifndef RF_ALIGN
+#ifdef _MSC_VER
+#define RF_ALIGN(x) __declspec(align(x))
+#else
 #define RF_ALIGN(x) __attribute__((aligned(x)))
+#endif
 #endif
 
 // this seems necessary only for gcc, otherwise hash is bogus
+#ifdef _MSC_VER
+typedef uint8_t  rf_u8;
+typedef uint16_t rf_u16;
+typedef uint32_t rf_u32;
+typedef uint64_t rf_u64;
+#else
 typedef __attribute__((may_alias)) uint8_t  rf_u8;
 typedef __attribute__((may_alias)) uint16_t rf_u16;
 typedef __attribute__((may_alias)) uint32_t rf_u32;
 typedef __attribute__((may_alias)) uint64_t rf_u64;
+#endif
 
 // 2048 entries for the rambox => 16kB
 #define RAMBOX_SIZE 2048
