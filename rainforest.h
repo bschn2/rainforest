@@ -36,29 +36,47 @@
 
 #include <stdint.h>
 
+#ifndef RF_ALIGN
+#ifdef _MSC_VER
+#define RF_ALIGN(x) __declspec(align(x))
+#else
+#define RF_ALIGN(x) __attribute__((aligned(x)))
+#endif
+#endif
+
 // this seems necessary only for gcc, otherwise hash is bogus
+#ifdef _MSC_VER
+typedef uint8_t  rf_u8;
+typedef uint16_t rf_u16;
+typedef uint32_t rf_u32;
+typedef uint64_t rf_u64;
+#else
 typedef __attribute__((may_alias)) uint8_t  rf_u8;
 typedef __attribute__((may_alias)) uint16_t rf_u16;
 typedef __attribute__((may_alias)) uint32_t rf_u32;
 typedef __attribute__((may_alias)) uint64_t rf_u64;
+#endif
 
 // 2048 entries for the rambox => 16kB
 #define RAMBOX_SIZE 2048
 #define RAMBOX_LOOPS 4
+#define RAMBOX_HIST 32
 
 typedef union {
   rf_u8  b[32];
   rf_u16 w[16];
   rf_u32 d[8];
   rf_u64 q[4];
-} hash256_t;
+} rf_hash256_t;
 
-typedef struct __attribute__((aligned(16))) rf_ctx {
-  uint64_t rambox[RAMBOX_SIZE];
-  hash256_t hash;
-  uint32_t crc;
+typedef struct RF_ALIGN(16) rf_ctx {
   uint32_t word;  // LE pending message
   uint32_t len;   // total message length
+  uint32_t crc;
+  uint32_t changes; // must remain lower than RAMBOX_HIST
+  rf_hash256_t RF_ALIGN(32) hash;
+  uint16_t hist[RAMBOX_HIST];
+  uint64_t RF_ALIGN(64) rambox[RAMBOX_SIZE];
 } rf256_ctx_t;
 
 void rf256_init(rf256_ctx_t *ctx);
