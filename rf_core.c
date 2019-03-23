@@ -351,6 +351,99 @@ static void rf_raminit(void *area)
 	}
 }
 
+#ifdef RF_DEBUG_RAMBOX
+// verify the ram box
+static void rf_ram_test(const void *area)
+{
+	uint64_t pat1 = 0x0123456789ABCDEFULL;
+	uint64_t pat2 = 0xFEDCBA9876543210ULL;
+	uint64_t pat3;
+	uint32_t pos;
+	const uint64_t *rambox = (const uint64_t *)area;
+
+	// Note: no need to mask the higher bits on armv8 nor x86 :
+	//
+	// From ARMv8's ref manual :
+	//     The register that is specified for a shift can be 32-bit or
+	//     64-bit. The amount to be shifted can be specified either as
+	//     an immediate, that is up to register size minus one, or by
+	//     a register where the value is taken only from the bottom five
+	//     (modulo-32) or six (modulo-64) bits.
+	//
+	// Here we rotate pat2 by pat1's bits and put it into pat1, and in
+	// parallel we rotate pat1 by pat2's bits and put it into pat2. Thus
+	// the two data blocks are exchanged in addition to being rotated.
+	// What is stored each time is the previous and the rotated blocks,
+	// which only requires one rotate and a register rename.
+
+	for (pos = 0; pos < RF_RAMBOX_SIZE; pos += 16) {
+		pat3 = pat1;
+		pat1 = rf_rotr64(pat2, (uint8_t)pat3) + 0x111;
+		if (rambox[pos + 0] != pat1)
+			abort();
+
+		if (rambox[pos + 1] != pat3)
+			abort();
+
+		pat3 = pat2;
+		pat2 = rf_rotr64(pat1, (uint8_t)pat3) + 0x222;
+		if (rambox[pos + 2] != pat2)
+			abort();
+
+		if (rambox[pos + 3] != pat3)
+			abort();
+
+		pat3 = pat1;
+		pat1 = rf_rotr64(pat2, (uint8_t)pat3) + 0x333;
+		if (rambox[pos + 4] != pat1)
+			abort();
+
+		if (rambox[pos + 5] != pat3)
+			abort();
+
+		pat3 = pat2;
+		pat2 = rf_rotr64(pat1, (uint8_t)pat3) + 0x444;
+		if (rambox[pos + 6] != pat2)
+			abort();
+
+		if (rambox[pos + 7] != pat3)
+			abort();
+
+		pat3 = pat1;
+		pat1 = rf_rotr64(pat2, (uint8_t)pat3) + 0x555;
+		if (rambox[pos + 8] != pat1)
+			abort();
+
+		if (rambox[pos + 9] != pat3)
+			abort();
+
+		pat3 = pat2;
+		pat2 = rf_rotr64(pat1, (uint8_t)pat3) + 0x666;
+		if (rambox[pos + 10] != pat2)
+			abort();
+
+		if (rambox[pos + 11] != pat3)
+			abort();
+
+		pat3 = pat1;
+		pat1 = rf_rotr64(pat2, (uint8_t)pat3) + 0x777;
+		if (rambox[pos + 12] != pat1)
+			abort();
+
+		if (rambox[pos + 13] != pat3)
+			abort();
+
+		pat3 = pat2;
+		pat2 = rf_rotr64(pat1, (uint8_t)pat3) + 0x888;
+		if (rambox[pos + 14] != pat2)
+			abort();
+
+		if (rambox[pos + 15] != pat3)
+			abort();
+	}
+}
+#endif
+
 // return p/q into p and rev(rev(q)+p) into q
 static inline void rf256_div_mod(uint64_t *p, uint64_t *q)
 {
@@ -577,6 +670,8 @@ int rf256_hash2(void *out, const void *in, size_t len, void *rambox, uint32_t se
 		rf_raminit(rambox);
 	}
 
+	//rf_ram_test(rambox);
+
 	rf256_init(&ctx, seed, rambox);
 
 	for (loops = 0; loops < RF256_LOOPS; loops++) {
@@ -597,6 +692,7 @@ int rf256_hash2(void *out, const void *in, size_t len, void *rambox, uint32_t se
 			loops--;
 			ctx.rambox[ctx.hist[loops]] = ctx.prev[loops];
 		} while (loops);
+		//rf_ram_test(rambox);
 	}
 	return 0;
 }
