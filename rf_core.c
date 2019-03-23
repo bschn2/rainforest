@@ -312,7 +312,7 @@ static inline void rf256_inject(rf256_ctx_t *ctx) {
 
 // rotate the hash by 32 bits. Not using streaming instructions (SSE/NEON) is
 // faster because the compiler can follow moves an use register renames.
-static inline void rf256_rot32x256(hash256_t *hash) {
+static inline void rf256_rot32x256(rf_hash256_t *hash) {
 #if defined(__x86_64__) || defined(__aarch64__) || defined(__ARM_ARCH_7A__)
   uint32_t t0, t1, t2;
 

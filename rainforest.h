@@ -51,11 +51,11 @@ typedef union {
   rf_u16 w[16];
   rf_u32 d[8];
   rf_u64 q[4];
-} hash256_t;
+} rf_hash256_t;
 
 typedef struct __attribute__((aligned(16))) rf_ctx {
   uint64_t rambox[RAMBOX_SIZE];
-  hash256_t hash;
+  rf_hash256_t hash;
   uint32_t crc;
   uint32_t word;  // LE pending message
   uint32_t len;   // total message length
