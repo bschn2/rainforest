@@ -54,7 +54,7 @@ int main(int argc, char **argv)
 	for (loops=0;loops<80;loops++)
 		msg[loops]=loops;
 
-	for (loops=0; loops<100000/*0*/; loops++) {
+	for (loops=0; loops<10000/*00*/; loops++) {
 		if (!(loops&0x3ffff))
 			printf("%u\n", loops);
 		rf256_hash(md, msg, sizeof(msg), rambox);

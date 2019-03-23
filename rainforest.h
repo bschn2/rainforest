@@ -36,7 +36,7 @@
 
 #include <stdint.h>
 
-#define RF_RAMBOX_SIZE 2048
+#define RF_RAMBOX_SIZE (96*1024*1024/8)
 
 int rf256_hash(void *out, const void *in, size_t len, void *rambox);
 int rf256_hash2(void *out, const void *in, size_t len, void *rambox, uint32_t seed);

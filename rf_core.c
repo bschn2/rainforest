@@ -73,11 +73,12 @@ typedef __attribute__((may_alias)) uint64_t rf_u64;
 #endif
 
 // 2048 entries for the rambox => 16kB
-#define RAMBOX_LOOPS 4
-#define RAMBOX_HIST 4096
+#define RAMBOX_LOOPS 1
+#define RAMBOX_HIST 256
 
-// number of loops run over the initial message
-#define RF256_LOOPS 16
+// number of loops run over the initial message. At 19 loops
+// most runs are under 256 changes
+#define RF256_LOOPS 19
 
 typedef union {
 	rf_u8  b[32];
@@ -261,11 +262,11 @@ static inline uint32_t rf_rambox(rf256_ctx_t *ctx, uint64_t old)
 
 	for (loops = 0; loops < RAMBOX_LOOPS; loops++) {
 		old = rf_add64_crc32(old);
-		idx = old & (RF_RAMBOX_SIZE - 1);
+		idx = old % RF_RAMBOX_SIZE;
 		p = &ctx->rambox[idx];
 		k = *p;
-		old += rf_rotr64(k, (uint8_t)(old/RF_RAMBOX_SIZE));
-		if ((int64_t)old >= 0) {
+		old += rf_rotr64(k, (uint8_t)(old / RF_RAMBOX_SIZE));
+		if (__builtin_clrsb(old) > 2) {
 			*p = old;
 			if (ctx->changes < RAMBOX_HIST) {
 				ctx->hist[ctx->changes] = idx;
@@ -684,9 +685,12 @@ int rf256_hash2(void *out, const void *in, size_t len, void *rambox, uint32_t se
 
 	if (alloc_rambox)
 		free(rambox);
-	else if (ctx.changes == RAMBOX_HIST)
+	else if (ctx.changes == RAMBOX_HIST) {
+		//printf("changes=%d\n", ctx.changes);
 		rf_raminit(rambox);
+	}
 	else if (ctx.changes > 0) {
+		//printf("changes=%d\n", ctx.changes);
 		loops = ctx.changes;
 		do {
 			loops--;
