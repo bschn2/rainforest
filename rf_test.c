@@ -54,7 +54,7 @@ int main(int argc, char **argv)
 	for (loops=0;loops<20;loops++)
 		msg[loops]=loops;
 
-	for (loops=0; loops<10000/*00*/; loops++) {
+	for (loops=0; loops<1000/*000*/; loops++) {
 		if (!(loops&0x3ffff))
 			printf("%u\n", loops);
 		msg[19] = loops;

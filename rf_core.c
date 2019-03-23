@@ -72,11 +72,11 @@ typedef __attribute__((may_alias)) uint32_t rf_u32;
 typedef __attribute__((may_alias)) uint64_t rf_u64;
 #endif
 
-#define RAMBOX_HIST 256
+#define RAMBOX_HIST 512
 
 // number of loops run over the initial message. At 19 loops
 // most runs are under 256 changes
-#define RF256_LOOPS 20
+#define RF256_LOOPS 320
 
 typedef union {
 	rf_u8  b[32];
@@ -260,7 +260,7 @@ static inline uint32_t rf_rambox(rf256_ctx_t *ctx, uint64_t old)
 	k = old;
 	old = rf_add64_crc32(old);
 	old ^= rf_revbit64(k);
-	if (__builtin_clrsb(old) > 2) {
+	if (__builtin_clrsb(old) > 5) {
 		idx = old % RF_RAMBOX_SIZE;
 		p = &ctx->rambox[idx];
 		k = *p;
