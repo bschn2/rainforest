@@ -28,7 +28,7 @@ int scanhash_rf256(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *
 	uint32_t *pdata = work->data;
 	uint32_t *ptarget = work->target;
 
-	const uint32_t Htarg = ptarget[7];
+	uint32_t Htarg = ptarget[7];
 	const uint32_t first_nonce = pdata[19];
 	uint32_t nonce = first_nonce;
 	volatile uint8_t *restart = &(work_restart[thr_id].restart);
@@ -36,7 +36,7 @@ int scanhash_rf256(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *
 	rf256_ctx_t ctx, ctx_common;
 
 	if (opt_benchmark)
-		ptarget[7] = 0x0cff;
+		Htarg = ptarget[7] = 0x0cff;
 
 	//printf("thd%d work=%p htarg=%08x ptarg7=%08x first_nonce=%08x max_nonce=%08x hashes_done=%Lu\n",
 	//       thr_id, work, Htarg, ptarget[7], first_nonce, max_nonce, (unsigned long)*hashes_done);
