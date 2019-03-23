@@ -442,6 +442,21 @@ static void rf_ram_test(const void *area)
 }
 #endif
 
+// mix each word with the precision lost from the other one when converting
+// it to an IEEE754 double floating point number.
+static inline void rf256_mix_fp_loss(uint64_t *p, uint64_t *q)
+{
+	uint64_t p0, q0;
+	uint64_t lp, lq;
+	double fp, fq;
+
+	p0 = *p;                q0 = *q;
+	fp = p0;                fq = q0;
+	lp = (uint64_t)fp ^ p0; lq = (uint64_t)fq ^ q0;
+	p0 += lq;               q0 += lp;
+	*p = p0;                *q = q0;
+}
+
 // return p/q into p and rev(rev(q)+p) into q
 static inline void rf256_div_mod(uint64_t *p, uint64_t *q)
 {
