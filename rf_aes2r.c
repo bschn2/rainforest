@@ -46,7 +46,7 @@ static uint8_t shifts[16] = {
 };
 
 /* add the round key to the state with simple XOR operation */
-static void add_round_key(uint8_t * state, uint8_t * rkey)
+static void add_round_key(uint8_t * state, const uint8_t * rkey)
 {
 	uint8_t i;
 
@@ -135,7 +135,7 @@ static inline uint32_t sbox(uint32_t in, uint8_t n)
 
 // this version is optimized for exactly two rounds.
 // _state_ must be 16-byte aligned.
-void aes2r_encrypt(uint8_t * state, uint8_t * key)
+void aes2r_encrypt(uint8_t * state, const uint8_t * key)
 {
 	uint32_t key_schedule[12] __attribute__((aligned(16)));
 	uint32_t t;
@@ -191,15 +191,15 @@ void aes2r_encrypt(uint8_t * state, uint8_t * key)
 		: "xmm0", "xmm1", "xmm2", "cc", "memory");
 #else
 	/* first round of the algorithm */
-	add_round_key(state, (uint8_t*)&key_schedule[0]);
+	add_round_key(state, (const uint8_t*)&key_schedule[0]);
 	sub_bytes(state);
 	shift_rows(state);
 	mix_columns(state);
-	add_round_key(state, (uint8_t*)&key_schedule[4]);
+	add_round_key(state, (const uint8_t*)&key_schedule[4]);
 
 	/* final round of the algorithm */
 	sub_bytes(state);
 	shift_rows(state);
-	add_round_key(state, (uint8_t*)&key_schedule[8]);
+	add_round_key(state, (const uint8_t*)&key_schedule[8]);
 #endif
 }

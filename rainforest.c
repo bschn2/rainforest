@@ -43,7 +43,7 @@
 #include "rainforest.h"
 
 // from aes2r.c
-void aes2r_encrypt(uint8_t * state, uint8_t * key);
+void aes2r_encrypt(uint8_t * state, const uint8_t * key);
 
 // these archs are fine with unaligned reads
 #if defined(__x86_64__)||defined(__aarch64__)
