@@ -671,10 +671,11 @@ static inline void rf256_final(void *out, rf256_ctx_t *ctx)
 
 // hash _len_ bytes from _in_ into _out_, using _seed_
 // _rambox_ must be either NULL or a pointer to an area RF_RAMBOX_SIZE*8 bytes
-// long preinitialized with rf_rambox_init().
+// long preinitialized with rf_rambox_init(). If _rambox_ is NULL but _template_
+// is set, it will be initialized from this template using memcpy().
 // The function returns 0 on success or -1 on allocation failure if rambox is
 // NULL.
-int rf256_hash2(void *out, const void *in, size_t len, void *rambox, uint32_t seed)
+int rf256_hash2(void *out, const void *in, size_t len, void *rambox, const void *template, uint32_t seed)
 {
 	rf256_ctx_t ctx;
 	unsigned int loops;
@@ -684,7 +685,11 @@ int rf256_hash2(void *out, const void *in, size_t len, void *rambox, uint32_t se
 		rambox = malloc(RF_RAMBOX_SIZE * 8);
 		if (rambox == NULL)
 			return -1;
-		rf_raminit(rambox);
+
+		if (template)
+			memcpy(rambox, template, RF_RAMBOX_SIZE * 8);
+		else
+			rf_raminit(rambox);
 	}
 
 	//rf_ram_test(rambox);
@@ -718,7 +723,7 @@ int rf256_hash2(void *out, const void *in, size_t len, void *rambox, uint32_t se
 }
 
 // hash _len_ bytes from _in_ into _out_
-int rf256_hash(void *out, const void *in, size_t len, void *rambox)
+int rf256_hash(void *out, const void *in, size_t len, void *rambox, const void *template)
 {
-	return rf256_hash2(out, in, len, rambox, RF256_INIT_CRC);
+	return rf256_hash2(out, in, len, rambox, template, RF256_INIT_CRC);
 }
