@@ -76,6 +76,9 @@ typedef __attribute__((may_alias)) uint64_t rf_u64;
 #define RAMBOX_LOOPS 4
 #define RAMBOX_HIST 32
 
+// number of loops run over the initial message
+#define RF256_LOOPS 16
+
 typedef union {
 	rf_u8  b[32];
 	rf_u16 w[16];
@@ -540,9 +543,6 @@ static inline void rf256_pad256(rf256_ctx_t *ctx)
 // finalize the hash and copy the result into _out_ if not null (256 bits)
 static inline void rf256_final(void *out, rf256_ctx_t *ctx)
 {
-	// pad to the next 256 bit boundary
-	rf256_pad256(ctx);
-
 	// always run 4 extra rounds to complete the last 128 bits
 	rf256_one_round(ctx);
 	rf256_one_round(ctx);
@@ -557,9 +557,16 @@ static inline void rf256_final(void *out, rf256_ctx_t *ctx)
 void rf256_hash2(void *out, const void *in, size_t len, uint32_t seed)
 {
 	rf256_ctx_t ctx;
+	unsigned int loops;
 
 	rf256_init(&ctx, seed);
-	rf256_update(&ctx, in, len);
+
+	for (loops = 0; loops < RF256_LOOPS; loops++) {
+		rf256_update(&ctx, in, len);
+		// pad to the next 256 bit boundary
+		rf256_pad256(&ctx);
+	}
+
 	rf256_final(out, &ctx);
 }
 
