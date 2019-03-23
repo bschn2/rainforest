@@ -174,13 +174,17 @@ static inline uint64_t rf_bswap64(uint64_t v) {
 
 // lookup _old_ in _rambox_, update it and perform a substitution if a matching
 // value is found.
-static inline uint32_t rf_rambox(uint64_t *rambox, uint64_t old) {
+static inline uint32_t rf_rambox(rf256_ctx_t *ctx, uint64_t old) {
   uint64_t *p, k;
+  uint32_t idx;
   int loops;
 
   for (loops=0; loops<RAMBOX_LOOPS; loops++) {
     old=rf_add64_crc32(old);
-    p=&rambox[old&(RAMBOX_SIZE-1)];
+    idx=old&(RAMBOX_SIZE-1);
+    if (ctx->changes < RAMBOX_HIST)
+	    ctx->hist[ctx->changes++] = idx;
+    p=&ctx->rambox[idx];
     k = *p;
     old+=rf_rotr64(k, (uint8_t) (old/RAMBOX_SIZE));
     *p = (int64_t)old < 0 ? k : old;
@@ -203,11 +207,12 @@ static inline void rf_w128(uint64_t *cell, size_t ofs, uint64_t x, uint64_t y) {
 }
 
 // initialize the ram box
-static void rf_raminit(uint64_t *rambox) {
+static void rf_raminit(rf256_ctx_t *ctx) {
   uint64_t pat1 = 0x0123456789ABCDEFULL;
   uint64_t pat2 = 0xFEDCBA9876543210ULL;
   uint64_t pat3;
   uint32_t pos;
+  uint64_t *rambox = ctx->rambox;
 
   // Note: no need to mask the higher bits on armv8 nor x86 :
   //
@@ -224,6 +229,7 @@ static void rf_raminit(uint64_t *rambox) {
   // What is stored each time is the previous and the rotated blocks,
   // which only requires one rotate and a register rename.
 
+  ctx->changes = 0;
   for (pos = 0; pos < RAMBOX_SIZE; pos += 16) {
     pat3 = pat1;
     pat1 = rf_rotr64(pat2, (uint8_t)pat3) + 0x111;
@@ -361,7 +367,7 @@ static inline void rf256_one_round(rf256_ctx_t *ctx) {
   rf256_divbox(ctx->hash.q, ctx->hash.q+1);
   rf256_scramble(ctx);
 
-  carry=rf_rambox(ctx->rambox, carry);
+  carry=rf_rambox(ctx, carry);
   rf256_rotbox(ctx->hash.q, ctx->hash.q+1, (uint8_t)(carry), (uint8_t)(carry>>56));
   rf256_scramble(ctx);
   rf256_divbox(ctx->hash.q, ctx->hash.q+1);
@@ -369,7 +375,7 @@ static inline void rf256_one_round(rf256_ctx_t *ctx) {
   rf256_divbox(ctx->hash.q, ctx->hash.q+1);
   rf256_scramble(ctx);
 
-  carry=rf_rambox(ctx->rambox, carry);
+  carry=rf_rambox(ctx, carry);
   rf256_rotbox(ctx->hash.q, ctx->hash.q+1, (uint8_t)(carry>>8), (uint8_t)(carry>>48));
   rf256_scramble(ctx);
   rf256_divbox(ctx->hash.q, ctx->hash.q+1);
@@ -377,7 +383,7 @@ static inline void rf256_one_round(rf256_ctx_t *ctx) {
   rf256_divbox(ctx->hash.q, ctx->hash.q+1);
   rf256_scramble(ctx);
 
-  carry=rf_rambox(ctx->rambox, carry);
+  carry=rf_rambox(ctx, carry);
   rf256_rotbox(ctx->hash.q, ctx->hash.q+1, (uint8_t)(carry>>16), (uint8_t)(carry>>40));
   rf256_scramble(ctx);
   rf256_divbox(ctx->hash.q, ctx->hash.q+1);
@@ -385,7 +391,7 @@ static inline void rf256_one_round(rf256_ctx_t *ctx) {
   rf256_divbox(ctx->hash.q, ctx->hash.q+1);
   rf256_scramble(ctx);
 
-  carry=rf_rambox(ctx->rambox,carry);
+  carry=rf_rambox(ctx, carry);
   rf256_rotbox(ctx->hash.q, ctx->hash.q+1, (uint8_t)(carry>>24), (uint8_t)(carry>>32));
   rf256_scramble(ctx);
   rf256_divbox(ctx->hash.q, ctx->hash.q+1);
@@ -396,7 +402,7 @@ static inline void rf256_one_round(rf256_ctx_t *ctx) {
 
 // initialize the hash state
 void rf256_init(rf256_ctx_t *ctx) {
-  rf_raminit(ctx->rambox);
+  rf_raminit(ctx);
   memcpy(ctx->hash.b, rf256_iv, sizeof(ctx->hash.b));
   ctx->crc=RF256_INIT_CRC;
   ctx->word=ctx->len=0;

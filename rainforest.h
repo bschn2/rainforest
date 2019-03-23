@@ -60,6 +60,7 @@ typedef __attribute__((may_alias)) uint64_t rf_u64;
 // 2048 entries for the rambox => 16kB
 #define RAMBOX_SIZE 2048
 #define RAMBOX_LOOPS 4
+#define RAMBOX_HIST 32
 
 typedef union {
   rf_u8  b[32];
@@ -72,7 +73,9 @@ typedef struct RF_ALIGN(16) rf_ctx {
   uint32_t word;  // LE pending message
   uint32_t len;   // total message length
   uint32_t crc;
+  uint32_t changes; // must remain lower than RAMBOX_HIST
   rf_hash256_t RF_ALIGN(32) hash;
+  uint16_t hist[RAMBOX_HIST];
   uint64_t RF_ALIGN(64) rambox[RAMBOX_SIZE];
 } rf256_ctx_t;
 

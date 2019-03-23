@@ -47,11 +47,26 @@ int scanhash_rf256(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *
 	// pre-compute the hash state based on the constant part of the header
 	rf256_init(&ctx_common);
 	rf256_update(&ctx_common, endiandata, 76);
+	ctx_common.changes = 0;
+
+	memcpy(&ctx, &ctx_common, sizeof(ctx));
 
 	do {
 		be32enc(&endiandata[19], nonce);
 #ifndef RF_DISABLE_CTX_MEMCPY
+#ifndef RF_DISABLE_CTX_HISTORY
+		if (ctx.changes == RAMBOX_HIST)
+			memcpy(&ctx, &ctx_common, sizeof(ctx));
+		else {
+			for (unsigned int i = 0; i < ctx.changes; i++) {
+				unsigned int k = ctx.hist[i];
+				ctx.rambox[k] = ctx_common.rambox[k];
+			}
+			memcpy(&ctx, &ctx_common, offsetof(rf256_ctx_t, hist));
+		}
+#else
 		memcpy(&ctx, &ctx_common, sizeof(ctx));
+#endif
 		rf256_update(&ctx, endiandata+19, 4);
 		if (ctx.hash.w[7])
 			goto next;
