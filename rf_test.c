@@ -33,7 +33,7 @@ static void print256(const uint8_t *b, const char *tag)
 int main(int argc, char **argv)
 {
 	unsigned int loops;
-	uint8_t msg[80];
+	uint32_t msg[20];
 	unsigned char md[32];
 	void *rambox;
 
@@ -51,14 +51,15 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	for (loops=0;loops<80;loops++)
+	for (loops=0;loops<20;loops++)
 		msg[loops]=loops;
 
 	for (loops=0; loops<10000/*00*/; loops++) {
 		if (!(loops&0x3ffff))
 			printf("%u\n", loops);
+		msg[19] = loops;
 		rf256_hash(md, msg, sizeof(msg), rambox);
-		memcpy(msg, md, 32);
+		//memcpy(msg, md, 32);
 	}
 	printf("%u\n", loops);
 	print256(md, "md");
