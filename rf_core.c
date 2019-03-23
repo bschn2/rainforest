@@ -74,7 +74,7 @@ typedef __attribute__((may_alias)) uint64_t rf_u64;
 
 // 2048 entries for the rambox => 16kB
 #define RAMBOX_LOOPS 4
-#define RAMBOX_HIST 32
+#define RAMBOX_HIST 8192
 
 // number of loops run over the initial message
 #define RF256_LOOPS 16
@@ -94,6 +94,7 @@ typedef struct RF_ALIGN(16) rf_ctx {
 	uint64_t *rambox;
 	rf_hash256_t RF_ALIGN(32) hash;
 	uint16_t hist[RAMBOX_HIST];
+	uint64_t prev[RAMBOX_HIST];
 } rf256_ctx_t;
 
 // the table is used as an 8 bit-aligned array of uint64_t for the first word,
@@ -254,17 +255,20 @@ static inline uint64_t rf_revbit64(uint64_t v)
 // value is found.
 static inline uint32_t rf_rambox(rf256_ctx_t *ctx, uint64_t old)
 {
-	uint64_t * p, k;
+	uint64_t *p, k;
 	uint32_t idx;
 	int loops;
 
 	for (loops = 0; loops < RAMBOX_LOOPS; loops++) {
 		old = rf_add64_crc32(old);
 		idx = old & (RF_RAMBOX_SIZE - 1);
-		if (ctx->changes < RAMBOX_HIST)
-			ctx->hist[ctx->changes++] = idx;
 		p = &ctx->rambox[idx];
 		k = *p;
+		if (ctx->changes < RAMBOX_HIST) {
+			ctx->hist[ctx->changes] = idx;
+			ctx->prev[ctx->changes] = k;
+			ctx->changes++;
+		}
 		old += rf_rotr64(k, (uint8_t)(old/RF_RAMBOX_SIZE));
 		*p = (int64_t)old < 0 ? k : old;
 	}
@@ -583,6 +587,15 @@ int rf256_hash2(void *out, const void *in, size_t len, void *rambox, uint32_t se
 
 	if (alloc_rambox)
 		free(rambox);
+	else if (ctx.changes == RAMBOX_HIST)
+		rf_raminit(rambox);
+	else if (ctx.changes > 0) {
+		loops = ctx.changes;
+		do {
+			loops--;
+			ctx.rambox[ctx.hist[loops]] = ctx.prev[loops];
+		} while (loops);
+	}
 	return 0;
 }
 
