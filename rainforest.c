@@ -42,9 +42,6 @@
 #endif
 #include "rainforest.h"
 
-// from aes2r.c
-void aes2r_encrypt(uint8_t * state, const uint8_t * key);
-
 // these archs are fine with unaligned reads
 #if defined(__x86_64__)||defined(__aarch64__)
 #define RF_UNALIGNED_LE64
@@ -54,6 +51,12 @@ void aes2r_encrypt(uint8_t * state, const uint8_t * key);
 #endif
 
 #define RF256_INIT_CRC 20180213
+
+// for aes2r_encrypt()
+#include "rf_aes2r.c"
+
+// for rf_crc32_32()
+#include "rf_crc32.c"
 
 // the table is used as an 8 bit-aligned array of uint64_t for the first word,
 // and as a 16 bit-aligned array of uint64_t for the second word. It is filled
@@ -112,8 +115,6 @@ const uint8_t rf256_iv[32] = {
   0x78,0xe9,0x90,0xd3,0xb3,0xc8,0x9b,0x7b,0x0a,0xc4,0x86,0x6e,0x4e,0x38,0xb3,0x6b,
   0x33,0x68,0x7c,0xed,0x73,0x35,0x4b,0x0a,0x97,0x25,0x4c,0x77,0x7a,0xaa,0x61,0x1b
 };
-
-#include "rf_crc32.c"
 
 // mix the current state with the crc and return the new crc
 static inline uint32_t rf_crc32x4(rf_u32 *state, uint32_t crc)
@@ -467,52 +468,3 @@ void rf256_hash2(void *out, const void *in, size_t len, uint32_t seed) {
   rf256_update(&ctx, in, len);
   rf256_final(out, &ctx);
 }
-
-#ifdef RAINFOREST_TEST
-static void print256(const uint8_t *b, const char *tag) {
-  printf("%s: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
-	 ".%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n",
-         tag,
-         b[0],  b[1],  b[2],  b[3],  b[4],  b[5],  b[6],  b[7],
-         b[8],  b[9],  b[10], b[11], b[12], b[13], b[14], b[15],
-         b[16], b[17], b[18], b[19], b[20], b[21], b[22], b[23],
-         b[24], b[25], b[26], b[27], b[28], b[29], b[30], b[31]);
-}
-
-int main(int argc, char **argv) {
-  unsigned int loops;
-  uint8_t msg[80];
-  unsigned char md[32];
-
-  if (argc>1) {
-    rf256_ctx_t ctx;
-    int arg;
-
-    rf256_init(&ctx);
-    for (arg=1; arg<argc; arg++)
-      rf256_update(&ctx, (uint8_t*)argv[arg], strlen(argv[arg]));
-    rf256_final(md, &ctx);
-    print256(md, "3step(argv1)   ");
-
-    rf256_hash(md, (uint8_t*)argv[1], strlen(argv[1]));
-    print256(md, "1step(argv1)   ");
-
-    rf256_hash(md, (uint8_t*)argv[1], strlen(argv[1])+1);
-    print256(md, "1step(argv1+\\0)");
-    return 0;
-  }
-
-  for (loops=0;loops<80;loops++)
-    msg[loops]=loops;
-
-  for (loops=0; loops<100000/*0*/; loops++) {
-    if (!(loops&0x3ffff))
-      printf("%u\n", loops);
-    rf256_hash(md, msg, sizeof(msg));
-    memcpy(msg, md, 32);
-  }
-  printf("%u\n", loops);
-  print256(md, "md");
-  exit(0);
-}
-#endif
