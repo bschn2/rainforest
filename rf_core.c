@@ -31,15 +31,8 @@
 // Note: always use the same options to build all files!
 //
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
-#ifdef _WIN32
-#include <io.h>
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
 #include "rainforest.h"
 
 // these archs are fine with unaligned reads
