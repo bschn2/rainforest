@@ -37,15 +37,6 @@ int main(int argc, char **argv)
 	unsigned char md[32];
 
 	if (argc>1) {
-		rf256_ctx_t ctx;
-		int arg;
-
-		rf256_init(&ctx);
-		for (arg=1; arg<argc; arg++)
-			rf256_update(&ctx, (uint8_t*)argv[arg], strlen(argv[arg]));
-		rf256_final(md, &ctx);
-		print256(md, "3step(argv1)   ");
-
 		rf256_hash(md, (uint8_t*)argv[1], strlen(argv[1]));
 		print256(md, "1step(argv1)   ");
 

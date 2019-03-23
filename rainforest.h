@@ -79,9 +79,6 @@ typedef struct RF_ALIGN(16) rf_ctx {
   uint64_t RF_ALIGN(64) rambox[RAMBOX_SIZE];
 } rf256_ctx_t;
 
-void rf256_init(rf256_ctx_t *ctx);
-void rf256_update(rf256_ctx_t *ctx, const void *msg, size_t len);
-void rf256_final(void *out, rf256_ctx_t *ctx);
 void rf256_hash(void *out, const void *in, size_t len);
 void rf256_hash2(void *out, const void *in, size_t len, uint32_t seed);
 

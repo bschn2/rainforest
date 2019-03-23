@@ -424,16 +424,16 @@ static inline void rf256_one_round(rf256_ctx_t *ctx)
 }
 
 // initialize the hash state
-void rf256_init(rf256_ctx_t *ctx)
+static void rf256_init(rf256_ctx_t *ctx, uint32_t seed)
 {
 	rf_raminit(ctx);
 	memcpy(ctx->hash.b, rf256_iv, sizeof(ctx->hash.b));
-	ctx->crc = RF256_INIT_CRC;
+	ctx->crc = seed;
 	ctx->word = ctx->len = 0;
 }
 
 // update the hash context _ctx_ with _len_ bytes from message _msg_
-void rf256_update(rf256_ctx_t *ctx, const void *msg, size_t len)
+static inline void rf256_update(rf256_ctx_t *ctx, const void *msg, size_t len)
 {
 	const uint8_t *msg8 = (uint8_t *)msg;
 
@@ -455,42 +455,45 @@ void rf256_update(rf256_ctx_t *ctx, const void *msg, size_t len)
 	}
 }
 
-// finalize the hash and copy the result into _out_ if not null (256 bits)
-void rf256_final(void *out, rf256_ctx_t *ctx)
+// pad to the next 256-bit (32 bytes) boundary
+static inline void rf256_pad256(rf256_ctx_t *ctx)
 {
+	const uint8_t pad256[32] = { 0, };
 	uint32_t pad;
 
-	if (ctx->len & 3)
-		rf256_one_round(ctx);
+	pad = (32 - ctx->len) & 0xF;
+	if (pad)
+		rf256_update(ctx, pad256, pad);
+}
 
-	// always work on at least 256 bits of input
-	for (pad = 0; pad + ctx->len < 32; pad += 4)
-		rf256_one_round(ctx);
+// finalize the hash and copy the result into _out_ if not null (256 bits)
+static inline void rf256_final(void *out, rf256_ctx_t *ctx)
+{
+	// pad to the next 256 bit boundary
+	rf256_pad256(ctx);
 
 	// always run 4 extra rounds to complete the last 128 bits
 	rf256_one_round(ctx);
 	rf256_one_round(ctx);
 	rf256_one_round(ctx);
 	rf256_one_round(ctx);
+
 	if (out)
 		memcpy(out, ctx->hash.b, 32);
-}
-
-// hash _len_ bytes from _in_ into _out_
-void rf256_hash(void *out, const void *in, size_t len)
-{
-	rf256_ctx_t ctx;
-	rf256_init(&ctx);
-	rf256_update(&ctx, in, len);
-	rf256_final(out, &ctx);
 }
 
 // hash _len_ bytes from _in_ into _out_, using _seed_
 void rf256_hash2(void *out, const void *in, size_t len, uint32_t seed)
 {
 	rf256_ctx_t ctx;
-	rf256_init(&ctx);
-	ctx.crc = seed;
+
+	rf256_init(&ctx, seed);
 	rf256_update(&ctx, in, len);
 	rf256_final(out, &ctx);
+}
+
+// hash _len_ bytes from _in_ into _out_
+void rf256_hash(void *out, const void *in, size_t len)
+{
+	return rf256_hash2(out, in, len, RF256_INIT_CRC);
 }
