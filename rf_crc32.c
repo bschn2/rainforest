@@ -79,13 +79,13 @@ static const uint32_t rf_crc32_table[256] = {
 static inline uint32_t rf_crc32_32(uint32_t crc, uint32_t msg)
 {
 #if !defined(RF_NOASM) && defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
-	__asm__("crc32w %w0,%w0,%w1\n":"+r"(crc):"r"(msg));
+	__asm__("crc32w %w0,%w0,%w1\n" : "+r"(crc) : "r"(msg));
 #else
-	crc=crc^msg;
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
+	crc = crc ^ msg;
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
 #endif
 	return crc;
 }
@@ -93,13 +93,13 @@ static inline uint32_t rf_crc32_32(uint32_t crc, uint32_t msg)
 static inline uint32_t rf_crc32_24(uint32_t crc, uint32_t msg)
 {
 #if !defined(RF_NOASM) && defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
-	__asm__("crc32b %w0,%w0,%w1\n":"+r"(crc):"r"(msg));
-	__asm__("crc32h %w0,%w0,%w1\n":"+r"(crc):"r"(msg>>8));
+	__asm__("crc32b %w0,%w0,%w1\n" : "+r"(crc) : "r"(msg));
+	__asm__("crc32h %w0,%w0,%w1\n" : "+r"(crc) : "r"(msg >> 8));
 #else
-	crc=crc^msg;
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
+	crc = crc ^ msg;
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
 #endif
 	return crc;
 }
@@ -107,11 +107,11 @@ static inline uint32_t rf_crc32_24(uint32_t crc, uint32_t msg)
 static inline uint32_t rf_crc32_16(uint32_t crc, uint32_t msg)
 {
 #if !defined(RF_NOASM) && defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
-	__asm__("crc32h %w0,%w0,%w1\n":"+r"(crc):"r"(msg));
+	__asm__("crc32h %w0,%w0,%w1\n" : "+r"(crc) : "r"(msg));
 #else
-	crc=crc^msg;
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
+	crc = crc ^ msg;
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
 #endif
 	return crc;
 }
@@ -119,10 +119,10 @@ static inline uint32_t rf_crc32_16(uint32_t crc, uint32_t msg)
 static inline uint32_t rf_crc32_8(uint32_t crc, uint32_t msg)
 {
 #if !defined(RF_NOASM) && defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
-	__asm__("crc32b %w0,%w0,%w1\n":"+r"(crc):"r"(msg));
+	__asm__("crc32b %w0,%w0,%w1\n" : "+r"(crc) : "r"(msg));
 #else
-	crc=crc^msg;
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
+	crc = crc ^ msg;
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
 #endif
 	return crc;
 }
@@ -131,22 +131,22 @@ static inline uint32_t rf_crc32_8(uint32_t crc, uint32_t msg)
 // instruction on ARM.
 static inline uint64_t rf_add64_crc32(uint64_t msg)
 {
-	uint64_t crc=0;
+	uint64_t crc = 0;
 
 #if !defined(RF_NOASM) && defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
-	__asm__("crc32x %w0,%w0,%x1\n":"+r"(crc):"r"(msg));
+	__asm__("crc32x %w0,%w0,%x1\n" : "+r"(crc) : "r"(msg));
 #else
-	crc^=(uint32_t)msg;
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
+	crc ^= (uint32_t)msg;
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
 
-	crc^=msg>>32;
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
-	crc=rf_crc32_table[crc&0xff]^(crc>>8);
+	crc ^= msg >> 32;
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
 #endif
-	return msg+crc;
+	return msg + crc;
 }
