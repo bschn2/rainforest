@@ -127,14 +127,16 @@ static inline uint32_t rf_crc32_8(uint32_t crc, uint32_t msg)
 	return crc;
 }
 
-// add to _msg_ its own crc32. use -mcpu=cortex-a53+crc to enable native CRC
-// instruction on ARM.
-static inline uint64_t rf_add64_crc32(uint64_t msg)
+/* returns a CRC32 of message <msg> from previous <crc>; the 32 highest bits
+ * are zeroed.
+ */
+static inline uint64_t rf_crc32_64(uint32_t crc, uint64_t msg)
 {
-	uint64_t crc = 0;
-
 #if !defined(RF_NOASM) && defined(__aarch64__) && defined(__ARM_FEATURE_CRC32)
-	__asm__("crc32x %w0,%w0,%x1\n" : "+r"(crc) : "r"(msg));
+	uint64_t crc64 = crc;
+
+	__asm__("crc32x %w0,%w0,%x2\n" : "=r"(crc64) : "0"(crc), "r"(msg));
+	return crc64;
 #else
 	crc ^= (uint32_t)msg;
 	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
@@ -147,6 +149,6 @@ static inline uint64_t rf_add64_crc32(uint64_t msg)
 	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
 	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
 	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	return crc;
 #endif
-	return msg + crc;
 }

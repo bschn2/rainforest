@@ -119,6 +119,13 @@ static inline uint32_t rf_crc32x4(rf_u32 *state, uint32_t crc)
 	return crc;
 }
 
+// add to _msg_ its own crc32. use -mcpu=cortex-a53+crc to enable native CRC
+// instruction on ARM.
+static inline uint64_t rf_add64_crc32(uint64_t msg)
+{
+	return msg + rf_crc32_64(0, msg);
+}
+
 // read 64 bit from possibly unaligned memory address _p_ in little endian mode
 static inline uint64_t rf_memr64(const uint8_t *p)
 {
