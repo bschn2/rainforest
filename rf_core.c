@@ -227,6 +227,26 @@ static inline uint64_t rf_bswap64(uint64_t v)
 	return v;
 }
 
+// reverse all bits in the word _v_
+static inline uint64_t rf_revbit64(uint64_t v)
+{
+#if defined(__aarch64__)
+	__asm__ volatile("rbit %0, %1\n" : "=r"(v) : "r"(v));
+#else
+	v = ((v & 0xaaaaaaaaaaaaaaaa) >> 1) | ((v & 0x5555555555555555) << 1);
+	v = ((v & 0xcccccccccccccccc) >> 2) | ((v & 0x3333333333333333) << 2);
+	v = ((v & 0xf0f0f0f0f0f0f0f0) >> 4) | ((v & 0x0f0f0f0f0f0f0f0f) << 4);
+#if defined(__x86_64__)
+	__asm__("bswap %0" : "=r"(v) : "0"(v));
+#else
+	v = ((v & 0xff00ff00ff00ff00ULL) >> 8)  | ((v & 0x00ff00ff00ff00ffULL) << 8);
+	v = ((v & 0xffff0000ffff0000ULL) >> 16) | ((v & 0x0000ffff0000ffffULL) << 16);
+	v = (v >> 32) | (v << 32);
+#endif
+#endif
+	return v;
+}
+
 // lookup _old_ in _rambox_, update it and perform a substitution if a matching
 // value is found.
 static inline uint32_t rf_rambox(rf256_ctx_t *ctx, uint64_t old)
