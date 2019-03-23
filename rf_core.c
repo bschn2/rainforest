@@ -74,7 +74,7 @@ typedef __attribute__((may_alias)) uint64_t rf_u64;
 
 // 2048 entries for the rambox => 16kB
 #define RAMBOX_LOOPS 4
-#define RAMBOX_HIST 8192
+#define RAMBOX_HIST 4096
 
 // number of loops run over the initial message
 #define RF256_LOOPS 16
@@ -264,13 +264,15 @@ static inline uint32_t rf_rambox(rf256_ctx_t *ctx, uint64_t old)
 		idx = old & (RF_RAMBOX_SIZE - 1);
 		p = &ctx->rambox[idx];
 		k = *p;
-		if (ctx->changes < RAMBOX_HIST) {
-			ctx->hist[ctx->changes] = idx;
-			ctx->prev[ctx->changes] = k;
-			ctx->changes++;
-		}
 		old += rf_rotr64(k, (uint8_t)(old/RF_RAMBOX_SIZE));
-		*p = (int64_t)old < 0 ? k : old;
+		if ((int64_t)old >= 0) {
+			*p = old;
+			if (ctx->changes < RAMBOX_HIST) {
+				ctx->hist[ctx->changes] = idx;
+				ctx->prev[ctx->changes] = k;
+				ctx->changes++;
+			}
+		}
 	}
 	return (uint32_t)old;
 }
