@@ -36,7 +36,9 @@
 
 #include <stdint.h>
 
-void rf256_hash(void *out, const void *in, size_t len);
-void rf256_hash2(void *out, const void *in, size_t len, uint32_t seed);
+#define RF_RAMBOX_SIZE 2048
+
+int rf256_hash(void *out, const void *in, size_t len, void *rambox);
+int rf256_hash2(void *out, const void *in, size_t len, void *rambox, uint32_t seed);
 
 #endif

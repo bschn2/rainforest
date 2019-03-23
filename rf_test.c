@@ -37,10 +37,10 @@ int main(int argc, char **argv)
 	unsigned char md[32];
 
 	if (argc>1) {
-		rf256_hash(md, (uint8_t*)argv[1], strlen(argv[1]));
+		rf256_hash(md, (uint8_t*)argv[1], strlen(argv[1]), NULL);
 		print256(md, "1step(argv1)   ");
 
-		rf256_hash(md, (uint8_t*)argv[1], strlen(argv[1])+1);
+		rf256_hash(md, (uint8_t*)argv[1], strlen(argv[1])+1, NULL);
 		print256(md, "1step(argv1+\\0)");
 		return 0;
 	}
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
 	for (loops=0; loops<100000/*0*/; loops++) {
 		if (!(loops&0x3ffff))
 			printf("%u\n", loops);
-		rf256_hash(md, msg, sizeof(msg));
+		rf256_hash(md, msg, sizeof(msg), NULL);
 		memcpy(msg, md, 32);
 	}
 	printf("%u\n", loops);

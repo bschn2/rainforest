@@ -33,6 +33,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include "rainforest.h"
 
 // these archs are fine with unaligned reads
 #if defined(__x86_64__)||defined(__aarch64__)
@@ -72,7 +73,6 @@ typedef __attribute__((may_alias)) uint64_t rf_u64;
 #endif
 
 // 2048 entries for the rambox => 16kB
-#define RAMBOX_SIZE 2048
 #define RAMBOX_LOOPS 4
 #define RAMBOX_HIST 32
 
@@ -91,9 +91,9 @@ typedef struct RF_ALIGN(16) rf_ctx {
 	uint32_t len;   // total message length
 	uint32_t crc;
 	uint32_t changes; // must remain lower than RAMBOX_HIST
+	uint64_t *rambox;
 	rf_hash256_t RF_ALIGN(32) hash;
 	uint16_t hist[RAMBOX_HIST];
-	uint64_t RF_ALIGN(64) rambox[RAMBOX_SIZE];
 } rf256_ctx_t;
 
 // the table is used as an 8 bit-aligned array of uint64_t for the first word,
@@ -260,12 +260,12 @@ static inline uint32_t rf_rambox(rf256_ctx_t *ctx, uint64_t old)
 
 	for (loops = 0; loops < RAMBOX_LOOPS; loops++) {
 		old = rf_add64_crc32(old);
-		idx = old & (RAMBOX_SIZE - 1);
+		idx = old & (RF_RAMBOX_SIZE - 1);
 		if (ctx->changes < RAMBOX_HIST)
 			ctx->hist[ctx->changes++] = idx;
 		p = &ctx->rambox[idx];
 		k = *p;
-		old += rf_rotr64(k, (uint8_t)(old/RAMBOX_SIZE));
+		old += rf_rotr64(k, (uint8_t)(old/RF_RAMBOX_SIZE));
 		*p = (int64_t)old < 0 ? k : old;
 	}
 	return (uint32_t)old;
@@ -287,13 +287,13 @@ static inline void rf_w128(uint64_t *cell, size_t ofs, uint64_t x, uint64_t y)
 }
 
 // initialize the ram box
-static void rf_raminit(rf256_ctx_t *ctx)
+static void rf_raminit(void *area)
 {
 	uint64_t pat1 = 0x0123456789ABCDEFULL;
 	uint64_t pat2 = 0xFEDCBA9876543210ULL;
 	uint64_t pat3;
 	uint32_t pos;
-	uint64_t *rambox = ctx->rambox;
+	uint64_t *rambox = (uint64_t *)area;
 
 	// Note: no need to mask the higher bits on armv8 nor x86 :
 	//
@@ -310,8 +310,7 @@ static void rf_raminit(rf256_ctx_t *ctx)
 	// What is stored each time is the previous and the rotated blocks,
 	// which only requires one rotate and a register rename.
 
-	ctx->changes = 0;
-	for (pos = 0; pos < RAMBOX_SIZE; pos += 16) {
+	for (pos = 0; pos < RF_RAMBOX_SIZE; pos += 16) {
 		pat3 = pat1;
 		pat1 = rf_rotr64(pat2, (uint8_t)pat3) + 0x111;
 		rf_w128(rambox + pos, 0, pat1, pat3);
@@ -498,12 +497,13 @@ static inline void rf256_one_round(rf256_ctx_t *ctx)
 }
 
 // initialize the hash state
-static void rf256_init(rf256_ctx_t *ctx, uint32_t seed)
+static void rf256_init(rf256_ctx_t *ctx, uint32_t seed, void *rambox)
 {
-	rf_raminit(ctx);
 	memcpy(ctx->hash.b, rf256_iv, sizeof(ctx->hash.b));
 	ctx->crc = seed;
 	ctx->word = ctx->len = 0;
+	ctx->changes = 0;
+	ctx->rambox = (uint64_t *)rambox;
 }
 
 // update the hash context _ctx_ with _len_ bytes from message _msg_
@@ -554,12 +554,24 @@ static inline void rf256_final(void *out, rf256_ctx_t *ctx)
 }
 
 // hash _len_ bytes from _in_ into _out_, using _seed_
-void rf256_hash2(void *out, const void *in, size_t len, uint32_t seed)
+// _rambox_ must be either NULL or a pointer to an area RF_RAMBOX_SIZE*8 bytes
+// long preinitialized with rf_rambox_init().
+// The function returns 0 on success or -1 on allocation failure if rambox is
+// NULL.
+int rf256_hash2(void *out, const void *in, size_t len, void *rambox, uint32_t seed)
 {
 	rf256_ctx_t ctx;
 	unsigned int loops;
+	int alloc_rambox = (rambox == NULL);
 
-	rf256_init(&ctx, seed);
+	if (alloc_rambox) {
+		rambox = malloc(RF_RAMBOX_SIZE * 8);
+		if (rambox == NULL)
+			return -1;
+		rf_raminit(rambox);
+	}
+
+	rf256_init(&ctx, seed, rambox);
 
 	for (loops = 0; loops < RF256_LOOPS; loops++) {
 		rf256_update(&ctx, in, len);
@@ -568,10 +580,14 @@ void rf256_hash2(void *out, const void *in, size_t len, uint32_t seed)
 	}
 
 	rf256_final(out, &ctx);
+
+	if (alloc_rambox)
+		free(rambox);
+	return 0;
 }
 
 // hash _len_ bytes from _in_ into _out_
-void rf256_hash(void *out, const void *in, size_t len)
+int rf256_hash(void *out, const void *in, size_t len, void *rambox)
 {
-	return rf256_hash2(out, in, len, RF256_INIT_CRC);
+	return rf256_hash2(out, in, len, rambox, RF256_INIT_CRC);
 }
