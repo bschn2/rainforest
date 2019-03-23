@@ -348,6 +348,7 @@ static inline void rf256_div_mod(uint64_t *p, uint64_t *q)
 {
 	uint64_t x = *p;
 	*p = x / *q;
+	__asm__ volatile("" :: "r"(*p)); // force to place the div first
 	*q = rf_revbit64(rf_revbit64(*q)+x);
 }
 
