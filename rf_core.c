@@ -343,6 +343,14 @@ static void rf_raminit(rf256_ctx_t *ctx)
 	}
 }
 
+// return p/q into p and rev(rev(q)+p) into q
+static inline void rf256_div_mod(uint64_t *p, uint64_t *q)
+{
+	uint64_t x = *p;
+	*p = x / *q;
+	*q = rf_revbit64(rf_revbit64(*q)+x);
+}
+
 // exec the div/mod box. _v0_ and _v1_ must be aligned.
 static inline void rf256_divbox(rf_u64 *v0, rf_u64 *v1)
 {
@@ -353,12 +361,12 @@ static inline void rf256_divbox(rf_u64 *v0, rf_u64 *v1)
 	ql = rf_bswap64(*v0);   qh = rf_bswap64(*v1);
 
 	if (!pl || !ql)   { pl = ql = 0; }
-	else if (pl > ql) { uint64_t p = pl; pl = p / ql; ql = rf_revbit64(rf_revbit64(ql)+p); }
-	else              { uint64_t p = pl; pl = ql / p; ql = rf_revbit64(rf_revbit64(p)+ql); }
+	else if (pl > ql) rf256_div_mod(&pl, &ql);
+	else              rf256_div_mod(&ql, &pl);
 
 	if (!ph || !qh)   { ph = qh = 0; }
-	else if (ph > qh) { uint64_t p = ph; ph = p / qh; qh = rf_revbit64(rf_revbit64(qh)+p); }
-	else              { uint64_t p = ph; ph = qh / p; qh = rf_revbit64(rf_revbit64(p)+qh); }
+	else if (ph > qh) rf256_div_mod(&ph, &qh);
+	else              rf256_div_mod(&qh, &ph);
 
 	pl += qh;               ph += ql;
 	*v0 -= pl;              *v1 -= ph;
