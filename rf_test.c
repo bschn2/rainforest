@@ -17,7 +17,7 @@
 #include <unistd.h>
 #endif
 
-#include "rainforest.c"
+#include "rf_core.c"
 
 static void print256(const uint8_t *b, const char *tag)
 {
