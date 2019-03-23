@@ -218,9 +218,9 @@ static inline uint64_t rf_rotr64(uint64_t v, uint8_t bits)
 // reverse all bytes in the word _v_
 static inline uint64_t rf_bswap64(uint64_t v)
 {
-#if defined(__x86_64__) && !defined(_MSC_VER)
+#if !defined(RF_NOASM) && defined(__x86_64__) && !defined(_MSC_VER)
 	__asm__("bswap %0":"+r"(v));
-#elif defined(__aarch64__)
+#elif !defined(RF_NOASM) && defined(__aarch64__)
 	__asm__("rev %0,%0\n":"+r"(v));
 #else
 	v = ((v & 0xff00ff00ff00ff00ULL) >> 8)  | ((v & 0x00ff00ff00ff00ffULL) << 8);
@@ -233,13 +233,13 @@ static inline uint64_t rf_bswap64(uint64_t v)
 // reverse all bits in the word _v_
 static inline uint64_t rf_revbit64(uint64_t v)
 {
-#if defined(__aarch64__)
+#if !defined(RF_NOASM) && defined(__aarch64__)
 	__asm__ volatile("rbit %0, %1\n" : "=r"(v) : "r"(v));
 #else
 	v = ((v & 0xaaaaaaaaaaaaaaaa) >> 1) | ((v & 0x5555555555555555) << 1);
 	v = ((v & 0xcccccccccccccccc) >> 2) | ((v & 0x3333333333333333) << 2);
 	v = ((v & 0xf0f0f0f0f0f0f0f0) >> 4) | ((v & 0x0f0f0f0f0f0f0f0f) << 4);
-#if defined(__x86_64__)
+#if !defined(RF_NOASM) && defined(__x86_64__)
 	__asm__("bswap %0" : "=r"(v) : "0"(v));
 #else
 	v = ((v & 0xff00ff00ff00ff00ULL) >> 8)  | ((v & 0x00ff00ff00ff00ffULL) << 8);
@@ -278,7 +278,7 @@ static inline uint32_t rf_rambox(rf256_ctx_t *ctx, uint64_t old)
 // write (_x_,_y_) at cell _cell_ for offset _ofs_
 static inline void rf_w128(uint64_t *cell, size_t ofs, uint64_t x, uint64_t y)
 {
-#if defined(__ARM_ARCH_8A) || defined(__AARCH64EL__)
+#if !defined(RF_NOASM) && (defined(__ARM_ARCH_8A) || defined(__AARCH64EL__))
 	// 128 bit at once is faster when exactly two parallelizable instructions are
 	// used between two calls to keep the pipe full.
 	__asm__ volatile("stp %0, %1, [%2,#%3]\n\t"
