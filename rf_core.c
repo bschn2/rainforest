@@ -353,12 +353,12 @@ static inline void rf256_divbox(rf_u64 *v0, rf_u64 *v1)
 	ql = rf_bswap64(*v0);   qh = rf_bswap64(*v1);
 
 	if (!pl || !ql)   { pl = ql = 0; }
-	else if (pl > ql) { uint64_t p = pl; pl = p / ql; ql = p % ql; }
-	else              { uint64_t p = pl; pl = ql / p; ql = ql % p; }
+	else if (pl > ql) { uint64_t p = pl; pl = p / ql; ql = rf_revbit64(rf_revbit64(ql)+p); }
+	else              { uint64_t p = pl; pl = ql / p; ql = rf_revbit64(rf_revbit64(p)+ql); }
 
 	if (!ph || !qh)   { ph = qh = 0; }
-	else if (ph > qh) { uint64_t p = ph; ph = p / qh; qh = p % qh; }
-	else              { uint64_t p = ph; ph = qh / p; qh = qh % p; }
+	else if (ph > qh) { uint64_t p = ph; ph = p / qh; qh = rf_revbit64(rf_revbit64(qh)+p); }
+	else              { uint64_t p = ph; ph = qh / p; qh = rf_revbit64(rf_revbit64(p)+qh); }
 
 	pl += qh;               ph += ql;
 	*v0 -= pl;              *v1 -= ph;
