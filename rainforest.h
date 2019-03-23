@@ -36,6 +36,10 @@
 
 #include <stdint.h>
 
+#ifndef RF_ALIGN
+#define RF_ALIGN(x) __attribute__((aligned(x)))
+#endif
+
 // this seems necessary only for gcc, otherwise hash is bogus
 typedef __attribute__((may_alias)) uint8_t  rf_u8;
 typedef __attribute__((may_alias)) uint16_t rf_u16;
@@ -53,7 +57,7 @@ typedef union {
   rf_u64 q[4];
 } rf_hash256_t;
 
-typedef struct __attribute__((aligned(16))) rf_ctx {
+typedef struct RF_ALIGN(16) rf_ctx {
   uint64_t rambox[RAMBOX_SIZE];
   rf_hash256_t hash;
   uint32_t crc;

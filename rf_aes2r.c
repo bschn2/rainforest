@@ -137,7 +137,7 @@ static inline uint32_t sbox(uint32_t in, uint8_t n)
 // _state_ must be 16-byte aligned.
 void aes2r_encrypt(uint8_t * state, const uint8_t * key)
 {
-	uint32_t key_schedule[12] __attribute__((aligned(16)));
+	uint32_t RF_ALIGN(16) key_schedule[12];
 	uint32_t t;
 
 	/* initialize key schedule; its first 16 bytes are the key */
