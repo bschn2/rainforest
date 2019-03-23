@@ -474,6 +474,7 @@ static inline void rf256_divbox(rf_u64 *v0, rf_u64 *v1)
 	//---- low word ----    ---- high word ----
 	pl = ~*v0;              ph = ~*v1;
 	ql = rf_bswap64(*v0);   qh = rf_bswap64(*v1);
+	rf256_mix_fp_loss(&ql, &qh);
 
 	if (!pl || !ql)   { pl = ql = 0; }
 	else if (pl > ql) rf256_div_mod(&pl, &ql);
@@ -495,11 +496,14 @@ static inline void rf256_rotbox(rf_u64 *v0, rf_u64 *v1, uint8_t b0, uint8_t b1)
 	//---- low word ----       ---- high word ----
 	l   = *v0;                 h   = *v1;
 	l   = rf_rotr64(l, b0);    h   = rf_rotl64(h, b1);
+	rf256_mix_fp_loss(&l, &h);
 	l  += rf_wltable(b0);      h  += rf_whtable(b1);
 	b0  = (uint8_t)l;          b1  = (uint8_t)h;
 	l   = rf_rotl64(l, b1);    h   = rf_rotr64(h, b0);
+	rf256_mix_fp_loss(&l, &h);
 	b0  = (uint8_t)l;          b1  = (uint8_t)h;
 	l   = rf_rotr64(l, b1);    h   = rf_rotl64(h, b0);
+	rf256_mix_fp_loss(&l, &h);
 	*v0 = l;                   *v1 = h;
 }
 
