@@ -92,7 +92,7 @@ typedef struct RF_ALIGN(16) rf_ctx {
 	uint32_t changes; // must remain lower than RAMBOX_HIST
 	uint64_t *rambox;
 	rf_hash256_t RF_ALIGN(32) hash;
-	uint16_t hist[RAMBOX_HIST];
+	uint32_t hist[RAMBOX_HIST];
 	uint64_t prev[RAMBOX_HIST];
 } rf256_ctx_t;
 
