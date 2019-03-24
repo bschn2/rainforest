@@ -6,6 +6,8 @@
 //   - on x86:   use gcc -march=native or -maes to enable AES-NI
 //   - on ARMv8: use gcc -march=native or -march=armv8-a+crypto+crc to enable
 //               CRC32 and AES extensions.
+//
+//   - build with gcc -pthread to enable multi-thread operations
 
 #include <sys/time.h>
 #include <signal.h>
@@ -17,12 +19,23 @@
 #include <windows.h>
 #else
 #include <unistd.h>
+#if defined(_REENTRANT)
+#include <pthread.h>
+#endif
 #endif
 
 #include "rf_core.c"
 
+// only defined when built with -pthread
+#if defined(_REENTRANT) && defined(PTHREAD_MUTEX_INITIALIZER)
+#define MAXTHREADS 256
+#else
+#define MAXTHREADS 1
+#endif
+
 static volatile unsigned long hashes;
 static struct timeval tv_start;
+static unsigned int threads = 1;
 
 /* test message */
 const uint8_t test_msg[80] =
@@ -44,7 +57,7 @@ const uint8_t test_msg_out256[32] =
 	"\xb9\xa6\xb9\x30\xf1\x09\xc5\xf7"
 	"\x29\x1c\x5c\x5c\x46\xf1\x5a\x94";
 
-void run_bench(void *rambox)
+void *run_bench(void *rambox)
 {
 	unsigned int loops = 0;
 	unsigned int i;
@@ -65,8 +78,13 @@ void run_bench(void *rambox)
 		 */
 		memcpy(msg, out, 32);
 		loops++;
+#if MAXTHREADS > 1
+		__sync_fetch_and_add(&hashes, 1);
+#else
 		hashes++;
+#endif
 	}
+	return NULL;
 }
 
 void report_bench(int sig)
@@ -75,7 +93,6 @@ void report_bench(int sig)
 	unsigned long work;
 	long sec, usec;
 	double elapsed;
-
 	(void)sig;
 
 	gettimeofday(&tv_now, NULL);
@@ -89,8 +106,11 @@ void report_bench(int sig)
 		sec -= 1;
 	}
 	elapsed = (double)sec + usec / 1000000.0;
-	printf("%.3f hashes/s (%lu hashes, %.3f sec)\n",
-	       (double)work / elapsed, work, elapsed);
+	printf("%lu hashes, %.3f sec, %u thread%s, %.3f H/s, %.3f H/s/thread\n",
+	       work, elapsed, threads, threads>1?"s":"",
+	       (double)work / elapsed,
+	       (double)work / elapsed / (double)threads);
+
 	alarm(1);
 }
 
@@ -109,10 +129,11 @@ void usage(const char *name, int ret)
 {
 	printf("usage: %s [options]*\n"
 	       "Options :\n"
-	       "  -h        : display this help\n"
-	       "  -b        : benchmark mode\n"
-	       "  -c        : validity check mode\n"
-	       "  -m <text> : hash this text\n"
+	       "  -h           : display this help\n"
+	       "  -b           : benchmark mode\n"
+	       "  -c           : validity check mode\n"
+	       "  -m <text>    : hash this text\n"
+	       "  -t <threads> : use this number of threads\n"
 	       "\n", name);
 	exit(ret);
 }
@@ -122,7 +143,6 @@ int main(int argc, char **argv)
 	unsigned int loops;
 	const char *name;
 	const char *text;
-	void *rambox;
 	enum {
 		MODE_NONE = 0,
 		MODE_BENCH,
@@ -147,6 +167,16 @@ int main(int argc, char **argv)
 				usage(name, 1);
 			text = *++argv;
 		}
+		else if (!strcmp(*argv, "-t")) {
+			if (!--argc)
+				usage(name, 1);
+			threads = atoi(*++argv);
+			if (threads < 1 || threads > MAXTHREADS) {
+				printf("Fatal: threads must be between 1 and %u (was %u)\n",
+				       MAXTHREADS, threads);
+				exit(1);
+			}
+		}
 		else if (!strcmp(*argv, "-h"))
 			usage(name, 0);
 		else
@@ -168,6 +198,7 @@ int main(int argc, char **argv)
 	if (mode == MODE_CHECK) {
 		uint8_t msg[80];
 		uint8_t out[32];
+		void *rambox;
 
 		rambox = malloc(RF_RAMBOX_SIZE * 8);
 		if (rambox == NULL)
@@ -203,15 +234,40 @@ int main(int argc, char **argv)
 	}
 
 	if (mode == MODE_BENCH) {
-		rambox = malloc(RF_RAMBOX_SIZE * 8);
-		if (rambox == NULL)
-			exit(1);
+#if MAXTHREADS > 1
+		pthread_t thread[MAXTHREADS];
+#endif
+		void *rambox[MAXTHREADS] = { NULL, };
+		unsigned int thr;
 
-		rf_raminit(rambox);
+		gettimeofday(&tv_start, NULL);
+
+		for (thr = 0; thr < threads; thr++) {
+			rambox[thr] = malloc(RF_RAMBOX_SIZE * 8);
+			if (rambox[thr] == NULL) {
+				printf("Failed to allocate memory for thread %u\n", thr);
+				exit(1);
+			}
+
+			rf_raminit(rambox[thr]);
+		}
 
 		signal(SIGALRM, report_bench);
 		alarm(1);
-		run_bench(rambox);
+
+#if MAXTHREADS > 1
+		for (thr = 0; thr < threads; thr++) {
+			if (pthread_create(&thread[thr], NULL,
+			                   run_bench, rambox[thr]) != 0) {
+				printf("Failed to start thread %u\n", thr);
+				exit(1);
+			}
+		}
+		for (thr = 0; thr < threads; thr++)
+			pthread_join(thread[thr], NULL);
+#else
+		run_bench(rambox[0]);
+#endif
 		/* should never get here */
 	}
 	exit(0);
