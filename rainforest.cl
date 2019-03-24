@@ -455,6 +455,14 @@ static inline ulong rf_bswap64(ulong v)
 	return v;
 }
 
+static inline ulong rf_revbit64(ulong v)
+{
+	v = ((v & 0xaaaaaaaaaaaaaaaa) >> 1) | ((v & 0x5555555555555555) << 1);
+	v = ((v & 0xcccccccccccccccc) >> 2) | ((v & 0x3333333333333333) << 2);
+	v = ((v & 0xf0f0f0f0f0f0f0f0) >> 4) | ((v & 0x0f0f0f0f0f0f0f0f) << 4);
+	return rf_bswap64(v);
+}
+
 static inline uint rf_rambox(ulong *rambox, ulong old)
 {
 	ulong *p;
