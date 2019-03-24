@@ -285,10 +285,8 @@ static inline uint rf_crc32_32(uint crc, uint msg)
 	return crc;
 }
 
-static inline ulong rf_add64_crc32(ulong msg)
+static inline ulong rf_crc32_64(uint crc, ulong msg) {
 {
-	ulong crc = 0;
-
 	crc ^= (uint)msg;
 	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
 	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
@@ -300,7 +298,7 @@ static inline ulong rf_add64_crc32(ulong msg)
 	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
 	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
 	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
-	return msg + crc;
+	return crc;
 }
 
 /////////////////////////////// same as rf_core.c ///////////////////////////
@@ -396,6 +394,11 @@ static inline uint rf_crc32x4(uint *state, uint crc)
 	crc = state[2] = rf_crc32_32(crc, state[2]);
 	crc = state[3] = rf_crc32_32(crc, state[3]);
 	return crc;
+}
+
+static inline ulong rf_add64_crc32(ulong msg)
+{
+	return msg + rf_crc32_64(0, msg);
 }
 
 static inline ulong rf_memr64(__constant const uchar *p)
