@@ -30,26 +30,125 @@ static void print256(const uint8_t *b, const char *tag)
 	       b[24], b[25], b[26], b[27], b[28], b[29], b[30], b[31]);
 }
 
+void usage(const char *name, int ret)
+{
+	printf("usage: %s [options]*\n"
+	       "Options :\n"
+	       "  -h        : display this help\n"
+	       "  -b        : benchmark mode\n"
+	       "  -c        : validity check mode\n"
+	       "  -m <text> : hash this text\n"
+	       "\n", name);
+	exit(ret);
+}
+
 int main(int argc, char **argv)
 {
 	unsigned int loops;
 	uint32_t msg[20];
 	unsigned char md[32];
+	const char *name;
+	const char *text;
 	void *rambox;
+	enum {
+		MODE_NONE = 0,
+		MODE_BENCH,
+		MODE_CHECK,
+		MODE_MESSAGE,
+	} mode;
+
+	name = argv[0];
+	argc--; argv++;
+	mode = MODE_NONE;
+	text = NULL;
+	while (argc > 0) {
+		if (!strcmp(*argv, "-b")) {
+			mode = MODE_BENCH;
+		}
+		else if (!strcmp(*argv, "-c")) {
+			mode = MODE_CHECK;
+		}
+		else if (!strcmp(*argv, "-m")) {
+			mode = MODE_MESSAGE;
+			if (!--argc)
+				usage(name, 1);
+			text = *++argv;
+		}
+		else if (!strcmp(*argv, "-h"))
+			usage(name, 0);
+		else
+			usage(name, 1);
+		argc--; argv++;
+	}
+
+	if (mode == MODE_NONE)
+		usage(name, 1);
+
+	if (mode == MODE_MESSAGE) {
+		uint8_t out[32];
+
+		rf256_hash(out, text, strlen(text), NULL, NULL);
+		print256(out, "out");
+		exit(0);
+	}
+
+	if (mode == MODE_CHECK) {
+		uint8_t msg[80];
+		uint8_t out[32];
+		uint8_t val[32] =
+			"\xd7\x76\xc9\xda\x11\x18\xe3\xb0"
+			"\x92\x7f\x36\x8e\x55\x73\x70\xe8"
+			"\xb9\xa6\xb9\x30\xf1\x09\xc5\xf7"
+			"\x29\x1c\x5c\x5c\x46\xf1\x5a\x94";
+
+		rambox = malloc(RF_RAMBOX_SIZE * 8);
+		if (rambox == NULL)
+			exit(1);
+		rf_raminit(rambox);
+
+		/* preinitialize the message with a complex pattern that
+		 * is easy to recognize.
+		 */
+		memcpy(msg,
+		       "\x01\x02\x04\x08\x10\x20\x40\x80"
+		       "\x01\x03\x05\x09\x11\x21\x41\x81"
+		       "\x02\x02\x06\x0A\x12\x22\x42\x82"
+		       "\x05\x06\x04\x0C\x14\x24\x44\x84"
+		       "\x09\x0A\x0C\x08\x18\x28\x48\x88"
+		       "\x11\x12\x14\x18\x10\x30\x50\x90"
+		       "\x21\x22\x24\x28\x30\x20\x60\xA0"
+		       "\x41\x42\x44\x48\x50\x60\x40\xC0"
+		       "\x81\x82\x84\x88\x90\xA0\xC0\x80"
+		       "\x18\x24\x42\x81\x99\x66\x55\xAA",
+		       sizeof(msg));
+
+		for (loops = 0; loops < 256; loops++) {
+			unsigned int i;
+
+			/* modify the message on each loop */
+			for (i = 0; i < sizeof(msg) / sizeof(msg[0]); i++)
+				msg[i] ^= loops;
+
+			rf256_hash(out, msg, sizeof(msg), rambox, NULL);
+
+			/* the output is reinjected at the beginning of the
+			 * message, before it is modified again.
+			 */
+			memcpy(msg, out, 32);
+		}
+		if (memcmp(out, val, sizeof(val)) != 0) {
+			print256(out, " invalid");
+			print256(val, "expected");
+			exit(1);
+		}
+		print256(out, "valid");
+		exit(0);
+	}
 
 	rambox = malloc(RF_RAMBOX_SIZE * 8);
 	if (rambox == NULL)
 		exit(1);
 	rf_raminit(rambox);
-
-	if (argc>1) {
-		rf256_hash(md, (uint8_t*)argv[1], strlen(argv[1]), rambox, NULL);
-		print256(md, "1step(argv1)   ");
-
-		rf256_hash(md, (uint8_t*)argv[1], strlen(argv[1])+1, rambox, NULL);
-		print256(md, "1step(argv1+\\0)");
-		return 0;
-	}
 
 	for (loops=0;loops<20;loops++)
 		msg[loops]=loops;
