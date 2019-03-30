@@ -776,8 +776,8 @@ static int rf256_hash2(void *out, const void *in, size_t len, __global void *ram
 
 	rf256_init(&ctx, seed, rambox);
 	msgh = rf_crc32_mem(0, in, len);
-	ctx.rb_o = msgh % ctx.rb_l;
-	ctx.rb_l = msgh % (ctx.rb_l - ctx.rb_o) + 1;
+	ctx.rb_o = msgh % (ctx.rb_l / 2);
+	ctx.rb_l = (ctx.rb_l / 2 - ctx.rb_o) * 2;
 
 	for (loops = 0; loops < RF256_LOOPS; loops++) {
 		rf256_update(&ctx, in, len);
