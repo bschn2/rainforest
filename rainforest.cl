@@ -26,6 +26,9 @@
  * ===========================(LICENSE END)=============================
  */
 
+#pragma OPENCL EXTENSION cl_amd_printf : enable
+#pragma OPENCL EXTENSION cl_intel_printf : enable
+
 #ifndef RAINFOREST_CL
 #define RAINFOREST_CL
 
@@ -470,12 +473,12 @@ static inline ulong rf_revbit64(ulong v)
 	return rf_bswap64(v);
 }
 
-static inline ulong __builtin_clrsb(ulong x)
+static inline ulong __builtin_clrsbl(long x)
 {
-	if ((long)x >= 0)
-		return clz(x);
+	if (x < 0)
+		return clz(~(x << 1));
 	else
-		return clz(~x);
+		return clz(x << 1);
 }
 
 static inline uint rf_rambox(rf256_ctx_t *ctx, ulong old)
@@ -483,13 +486,11 @@ static inline uint rf_rambox(rf256_ctx_t *ctx, ulong old)
 	__global ulong *p;
 	ulong k;
 	uint idx;
-//FIXME
-return old;
 
 	k = old;
 	old = rf_add64_crc32(old);
 	old ^= rf_revbit64(k);
-	if (__builtin_clrsb(old) > 5) {
+	if (__builtin_clrsbl(old) > 5) {
 		idx = old % RF_RAMBOX_SIZE;
 		p = &ctx->rambox[idx];
 		k = *p;
@@ -515,10 +516,7 @@ static void rf_raminit(__global ulong *rambox)
 	ulong pat1 = 0x0123456789ABCDEFULL;
 	ulong pat2 = 0xFEDCBA9876543210ULL;
 	ulong pat3;
-	uint pos;
-
-//FIXME
-return;
+	ulong pos;
 
 	for (pos = 0; pos < RF_RAMBOX_SIZE; pos += 16) {
 		pat3 = pat1;
@@ -796,63 +794,58 @@ static int rf256_hash(void *out, const void *in, size_t len, __global void *ramb
 // padcache: clState->padbuffer8   (96 MB / thread)
 
 __attribute__((reqd_work_group_size(WORKSIZE, 1, 1)))
-__kernel void search(__global const ulong * restrict input, volatile __global uint * restrict output, __global ulong * restrict padcache, const ulong target)
+__kernel void search(__global const ulong *input, __global uint *output, __global ulong *padcache, const ulong target)
 {
 	uint gid = get_global_id(0);
 	uchar data[80];
 	rf256_ctx_t ctx;
 	uchar hash[32];
-	__global ulong *rambox = padcache + (gid - get_global_offset(0)) * RF_RAMBOX_SIZE;
+	__global ulong *rambox = padcache + (gid % MAX_GLOBAL_THREADS) * RF_RAMBOX_SIZE;
 
-	rf_raminit(rambox);
+	// the rambox must be initialized by the first call for each thread
+	if (gid < MAX_GLOBAL_THREADS) {
+		// printf("init glob %u lt %u maxglob=%u\n", gid, get_local_id(0), MAX_GLOBAL_THREADS);
+		rf_raminit(rambox);
+	}
 
 	((uint16 *)data)[0] = ((__global const uint16 *)input)[0];
 	((uint4 *)data)[4] = ((__global const uint4 *)input)[4];
 
-//#define INIT_USING_MEMCPY
-//	// rf256_init() is slightly faster than memcpy(), but init()+update()
-//	// are slower. Using the pre-calculated context brings around 50%
-//	// performance gain.
-//#ifdef INIT_USING_MEMCPY
-//	for (int i = 0; i < sizeof(ctx) / 4; i++)
-//		((uint*)&ctx)[i]=((__global uint*)padcache)[i];
-//#else
-//	rf256_init(&ctx);
-//	rf256_update(&ctx, &data, 76);
-//#endif
-//
-//	rf256_update(&ctx, &gid, 4);
-//	rf256_final(&hash, &ctx);
-
 	rf256_hash(&hash, &data, 80, rambox, 0);
 
 	if (1 && gid == 0/*0x123456*/) { // only for debugging
-		int i;
-		printf("rainforest: gid=%u ggo=%u padcache=%p rambox=%p\n", gid, get_global_offset(0), padcache, rambox);
-		printf("  data:\n");
-		printf("     %02x %02x %02x %02x %02x %02x %02x %02x\n", data[0x00], data[0x01], data[0x02], data[0x03], data[0x04], data[0x05], data[0x06], data[0x07]);
-		printf("     %02x %02x %02x %02x %02x %02x %02x %02x\n", data[0x08], data[0x09], data[0x0a], data[0x0b], data[0x0c], data[0x0d], data[0x0e], data[0x0f]);
-		printf("     %02x %02x %02x %02x %02x %02x %02x %02x\n", data[0x10], data[0x11], data[0x12], data[0x13], data[0x14], data[0x15], data[0x16], data[0x17]);
-		printf("     %02x %02x %02x %02x %02x %02x %02x %02x\n", data[0x18], data[0x19], data[0x1a], data[0x1b], data[0x1c], data[0x1d], data[0x1e], data[0x1f]);
-		printf("     %02x %02x %02x %02x %02x %02x %02x %02x\n", data[0x20], data[0x21], data[0x22], data[0x23], data[0x24], data[0x25], data[0x26], data[0x27]);
-		printf("     %02x %02x %02x %02x %02x %02x %02x %02x\n", data[0x28], data[0x29], data[0x2a], data[0x2b], data[0x2c], data[0x2d], data[0x2e], data[0x2f]);
-		printf("     %02x %02x %02x %02x %02x %02x %02x %02x\n", data[0x30], data[0x31], data[0x32], data[0x33], data[0x34], data[0x35], data[0x36], data[0x37]);
-		printf("     %02x %02x %02x %02x %02x %02x %02x %02x\n", data[0x38], data[0x39], data[0x3a], data[0x3b], data[0x3c], data[0x3d], data[0x3e], data[0x3f]);
-		printf("     %02x %02x %02x %02x %02x %02x %02x %02x\n", data[0x40], data[0x41], data[0x42], data[0x43], data[0x44], data[0x45], data[0x46], data[0x47]);
-		printf("     %02x %02x %02x %02x %02x %02x %02x %02x\n", data[0x48], data[0x49], data[0x4a], data[0x4b],
-		       ((uchar *)&gid)[0], ((uchar *)&gid)[1], ((uchar *)&gid)[2], ((uchar *)&gid)[3]);
+		printf("[%u] data:\n"
+		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+		       "   hash:\n"
+		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n",
+		       gid,
+		       data[0x00], data[0x01], data[0x02], data[0x03], data[0x04], data[0x05], data[0x06], data[0x07],
+		       data[0x08], data[0x09], data[0x0a], data[0x0b], data[0x0c], data[0x0d], data[0x0e], data[0x0f],
+		       data[0x10], data[0x11], data[0x12], data[0x13], data[0x14], data[0x15], data[0x16], data[0x17],
+		       data[0x18], data[0x19], data[0x1a], data[0x1b], data[0x1c], data[0x1d], data[0x1e], data[0x1f],
+		       data[0x20], data[0x21], data[0x22], data[0x23], data[0x24], data[0x25], data[0x26], data[0x27],
+		       data[0x28], data[0x29], data[0x2a], data[0x2b], data[0x2c], data[0x2d], data[0x2e], data[0x2f],
+		       data[0x30], data[0x31], data[0x32], data[0x33], data[0x34], data[0x35], data[0x36], data[0x37],
+		       data[0x38], data[0x39], data[0x3a], data[0x3b], data[0x3c], data[0x3d], data[0x3e], data[0x3f],
+		       data[0x40], data[0x41], data[0x42], data[0x43], data[0x44], data[0x45], data[0x46], data[0x47],
+		       data[0x48], data[0x49], data[0x4a], data[0x4b], ((uchar *)&gid)[0], ((uchar *)&gid)[1], ((uchar *)&gid)[2], ((uchar *)&gid)[3],
 
-		//rf256_init(&ctx);
-		//aes2r_encrypt(ctx.hash.b, ctx.hash.b+16);
-		////ctx.hash.q[0]=0x0123456789abcdef;
-		//for (i=0;i<80;i++)
-		//  hash[i]=ctx.hash.b[i];
-
-		printf("   hash:\n");
-		printf("     %02x %02x %02x %02x %02x %02x %02x %02x\n", hash[0x00], hash[0x01], hash[0x02], hash[0x03], hash[0x04], hash[0x05], hash[0x06], hash[0x07]);
-		printf("     %02x %02x %02x %02x %02x %02x %02x %02x\n", hash[0x08], hash[0x09], hash[0x0a], hash[0x0b], hash[0x0c], hash[0x0d], hash[0x0e], hash[0x0f]);
-		printf("     %02x %02x %02x %02x %02x %02x %02x %02x\n", hash[0x10], hash[0x11], hash[0x12], hash[0x13], hash[0x14], hash[0x15], hash[0x16], hash[0x17]);
-		printf("     %02x %02x %02x %02x %02x %02x %02x %02x\n", hash[0x18], hash[0x19], hash[0x1a], hash[0x1b], hash[0x1c], hash[0x1d], hash[0x1e], hash[0x1f]);
+		       hash[0x00], hash[0x01], hash[0x02], hash[0x03], hash[0x04], hash[0x05], hash[0x06], hash[0x07],
+		       hash[0x08], hash[0x09], hash[0x0a], hash[0x0b], hash[0x0c], hash[0x0d], hash[0x0e], hash[0x0f],
+		       hash[0x10], hash[0x11], hash[0x12], hash[0x13], hash[0x14], hash[0x15], hash[0x16], hash[0x17],
+		       hash[0x18], hash[0x19], hash[0x1a], hash[0x1b], hash[0x1c], hash[0x1d], hash[0x1e], hash[0x1f]);
 	}
 
 	barrier(CLK_LOCAL_MEM_FENCE);

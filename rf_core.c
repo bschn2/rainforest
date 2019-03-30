@@ -260,7 +260,7 @@ static inline uint32_t rf_rambox(rf256_ctx_t *ctx, uint64_t old)
 	k = old;
 	old = rf_add64_crc32(old);
 	old ^= rf_revbit64(k);
-	if (__builtin_clrsb(old) > 5) {
+	if (__builtin_clrsbl(old) > 5) {
 		idx = old % RF_RAMBOX_SIZE;
 		p = &ctx->rambox[idx];
 		k = *p;
