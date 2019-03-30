@@ -288,6 +288,13 @@ static inline uint rf_crc32_32(uint crc, uint msg)
 	return crc;
 }
 
+static inline uint rf_crc32_8(uint crc, uchar msg)
+{
+	crc = crc ^ msg;
+	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	return crc;
+}
+
 static inline ulong rf_crc32_64(uint crc, ulong msg)
 {
 	crc ^= (uint)msg;
@@ -301,6 +308,14 @@ static inline ulong rf_crc32_64(uint crc, ulong msg)
 	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
 	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
 	crc = rf_crc32_table[crc & 0xff] ^ (crc >> 8);
+	return crc;
+}
+
+static inline uint rf_crc32_mem(uint crc, const void *msg, size_t len)
+{
+	while (len--) {
+		crc = rf_crc32_8(crc, *(uchar*)msg++);
+	}
 	return crc;
 }
 
@@ -334,6 +349,8 @@ typedef struct RF_ALIGN(16) rf_ctx {
 	uint crc;
 	uint changes; // must remain lower than RAMBOX_HIST
 	__global ulong *rambox;
+	uint rb_o;    // rambox offset
+	uint rb_l;    // rambox length
 	hash256_t RF_ALIGN(32) hash;
 	uint  hist[RAMBOX_HIST];
 	ulong prev[RAMBOX_HIST];
@@ -491,10 +508,10 @@ static inline uint rf_rambox(rf256_ctx_t *ctx, ulong old)
 	old = rf_add64_crc32(old);
 	old ^= rf_revbit64(k);
 	if (__builtin_clrsbl(old) > 5) {
-		idx = old % RF_RAMBOX_SIZE;
+		idx = ctx->rb_o + old % ctx->rb_l;
 		p = &ctx->rambox[idx];
 		k = *p;
-		old += rf_rotr64(k, old / RF_RAMBOX_SIZE);
+		old += rf_rotr64(k, old / ctx->rb_l);
 		*p = old;
 		if (ctx->changes < RAMBOX_HIST) {
 			ctx->hist[ctx->changes] = idx;
@@ -694,6 +711,8 @@ static void rf256_init(rf256_ctx_t *ctx, uint seed, __global void *rambox)
 	ctx->crc = seed;
 	ctx->word = ctx->len = 0;
 	ctx->changes = 0;
+	ctx->rb_o = 0;
+	ctx->rb_l = RF_RAMBOX_SIZE;
 	ctx->rambox = (__global ulong *)rambox;
 }
 
@@ -738,6 +757,7 @@ static int rf256_hash2(void *out, const void *in, size_t len, __global void *ram
 {
 	rf256_ctx_t ctx;
 	uint loops;
+	uint msgh;
 
 	//int alloc_rambox = (rambox == NULL);
 	//
@@ -755,6 +775,9 @@ static int rf256_hash2(void *out, const void *in, size_t len, __global void *ram
 	//rf_ram_test(rambox);
 
 	rf256_init(&ctx, seed, rambox);
+	msgh = rf_crc32_mem(0, in, len);
+	ctx.rb_o = msgh % ctx.rb_l;
+	ctx.rb_l = msgh % (ctx.rb_l - ctx.rb_o) + 1;
 
 	for (loops = 0; loops < RF256_LOOPS; loops++) {
 		rf256_update(&ctx, in, len);

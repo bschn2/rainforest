@@ -91,6 +91,8 @@ typedef struct RF_ALIGN(16) rf_ctx {
 	uint32_t crc;
 	uint32_t changes; // must remain lower than RAMBOX_HIST
 	uint64_t *rambox;
+	uint32_t rb_o;    // rambox offset
+	uint32_t rb_l;    // rambox length
 	rf_hash256_t RF_ALIGN(32) hash;
 	uint32_t hist[RAMBOX_HIST];
 	uint64_t prev[RAMBOX_HIST];
@@ -261,10 +263,10 @@ static inline uint32_t rf_rambox(rf256_ctx_t *ctx, uint64_t old)
 	old = rf_add64_crc32(old);
 	old ^= rf_revbit64(k);
 	if (__builtin_clrsbl(old) > 5) {
-		idx = old % RF_RAMBOX_SIZE;
+		idx = ctx->rb_o + old % ctx->rb_l;
 		p = &ctx->rambox[idx];
 		k = *p;
-		old += rf_rotr64(k, (uint8_t)(old / RF_RAMBOX_SIZE));
+		old += rf_rotr64(k, (uint8_t)(old / ctx->rb_l));
 		*p = old;
 		if (ctx->changes < RAMBOX_HIST) {
 			ctx->hist[ctx->changes] = idx;
@@ -619,6 +621,8 @@ static void rf256_init(rf256_ctx_t *ctx, uint32_t seed, void *rambox)
 	ctx->crc = seed;
 	ctx->word = ctx->len = 0;
 	ctx->changes = 0;
+	ctx->rb_o = 0;
+	ctx->rb_l = RF_RAMBOX_SIZE;
 	ctx->rambox = (uint64_t *)rambox;
 }
 
@@ -680,6 +684,7 @@ int rf256_hash2(void *out, const void *in, size_t len, void *rambox, const void 
 	rf256_ctx_t ctx;
 	unsigned int loops;
 	int alloc_rambox = (rambox == NULL);
+	uint32_t msgh;
 
 	if (alloc_rambox) {
 		rambox = malloc(RF_RAMBOX_SIZE * 8);
@@ -695,6 +700,9 @@ int rf256_hash2(void *out, const void *in, size_t len, void *rambox, const void 
 	//rf_ram_test(rambox);
 
 	rf256_init(&ctx, seed, rambox);
+	msgh = rf_crc32_mem(0, in, len);
+	ctx.rb_o = msgh % ctx.rb_l;
+	ctx.rb_l = msgh % (ctx.rb_l - ctx.rb_o) + 1;
 
 	for (loops = 0; loops < RF256_LOOPS; loops++) {
 		rf256_update(&ctx, in, len);
