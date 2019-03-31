@@ -28,6 +28,7 @@
 
 #pragma OPENCL EXTENSION cl_amd_printf : enable
 #pragma OPENCL EXTENSION cl_intel_printf : enable
+#pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
 #ifndef RAINFOREST_CL
 #define RAINFOREST_CL
@@ -330,7 +331,7 @@ static inline uint rf_crc32_mem(uint crc, const void *msg, size_t len)
 #define RF_ALIGN(x) __attribute__((aligned(x)))
 #endif
 
-#define RAMBOX_HIST 512
+#define RAMBOX_HIST 1024
 
 // number of loops run over the initial message. At 19 loops
 // most runs are under 256 changes
@@ -753,10 +754,15 @@ static void rf256_final(void *out, rf256_ctx_t *ctx)
 	*(uint8 *)out = *(uint8 *)ctx->hash.b;
 }
 
+static uchar sin_scaled(uint x)
+{
+	return pow(sin(x / 16.0), 5) * 127.0 + 128.0;
+}
+
 static int rf256_hash2(void *out, const void *in, size_t len, __global void *rambox, __global const void *template, uint seed)
 {
 	rf256_ctx_t ctx;
-	uint loops;
+	uint loop, loops;
 	uint msgh;
 
 	//int alloc_rambox = (rambox == NULL);
@@ -779,7 +785,8 @@ static int rf256_hash2(void *out, const void *in, size_t len, __global void *ram
 	ctx.rb_o = msgh % (ctx.rb_l / 2);
 	ctx.rb_l = (ctx.rb_l / 2 - ctx.rb_o) * 2;
 
-	for (loops = 0; loops < RF256_LOOPS; loops++) {
+	loops = sin_scaled(msgh) * 3;
+	for (loop = 0; loop < loops; loop++) {
 		rf256_update(&ctx, in, len);
 		// pad to the next 256 bit boundary
 		rf256_pad256(&ctx);
@@ -806,6 +813,37 @@ static int rf256_hash2(void *out, const void *in, size_t len, __global void *ram
 static int rf256_hash(void *out, const void *in, size_t len, __global void *rambox, __global const void *template)
 {
 	return rf256_hash2(out, in, len, rambox, template, RF256_INIT_CRC);
+}
+
+// validate that the sin() and pow() functions work as expected
+static void check_sin()
+{
+	volatile uint i; // volatile to work around optimisation bug in opencl causing d to receive 1/16 increments
+	uint stop;
+	double d;
+	ulong sum1, sum5;
+	uint prev1, prev5;
+	uint next1, next5;
+
+	stop = 0x11111;
+
+	i = -0x11111;
+	prev1 = prev5 = 0;
+	sum1 = sum5 = 0;
+	do {
+		d = i / 16.0;
+		next1 = (int)(sin(d) * 65536.0);
+		next5 = (int)(pow(sin(d), 5) * 65536.0);
+		sum1 += next1 ^ prev1 ^ i;
+		prev1 = next1;
+		sum5 += next5 ^ prev5 ^ i;
+		prev5 = next5;
+		i++;
+	} while (i != stop);
+
+	if (sum1 != 300239689190865 || sum5 != 300239688428374) {
+		printf("gid=%d sum1=%ld sum5=%ld p1=%u p5=%u d=%f\n", get_global_id(0), sum1, sum5, prev1, prev5, d);
+	}
 }
 
 ////////////////////////// equivalent of rf_cpuminer.c ////////////////////////

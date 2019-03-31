@@ -31,6 +31,7 @@
 // Note: always use the same options to build all files!
 //
 
+#include <math.h>
 #include <stdint.h>
 #include <string.h>
 #include "rainforest.h"
@@ -72,7 +73,7 @@ typedef __attribute__((may_alias)) uint32_t rf_u32;
 typedef __attribute__((may_alias)) uint64_t rf_u64;
 #endif
 
-#define RAMBOX_HIST 512
+#define RAMBOX_HIST 1024
 
 // number of loops run over the initial message. At 19 loops
 // most runs are under 256 changes
@@ -673,6 +674,14 @@ static inline void rf256_final(void *out, rf256_ctx_t *ctx)
 		memcpy(out, ctx->hash.b, 32);
 }
 
+// apply a linear sine to a discrete integer to validate that the platform
+// operates a 100% compliant FP stack. Non-IEEE754 FPU will fail to provide
+// valid values for all inputs. The operation simply is (sin(x/16)^5)*127+128.
+static uint8_t sin_scaled(unsigned int x)
+{
+	return pow(sin(x / 16.0), 5) * 127.0 + 128.0;
+}
+
 // hash _len_ bytes from _in_ into _out_, using _seed_
 // _rambox_ must be either NULL or a pointer to an area RF_RAMBOX_SIZE*8 bytes
 // long preinitialized with rf_rambox_init(). If _rambox_ is NULL but _template_
@@ -682,7 +691,7 @@ static inline void rf256_final(void *out, rf256_ctx_t *ctx)
 int rf256_hash2(void *out, const void *in, size_t len, void *rambox, const void *template, uint32_t seed)
 {
 	rf256_ctx_t ctx;
-	unsigned int loops;
+	unsigned int loop, loops;
 	int alloc_rambox = (rambox == NULL);
 	uint32_t msgh;
 
@@ -704,7 +713,8 @@ int rf256_hash2(void *out, const void *in, size_t len, void *rambox, const void 
 	ctx.rb_o = msgh % (ctx.rb_l / 2);
 	ctx.rb_l = (ctx.rb_l / 2 - ctx.rb_o) * 2;
 
-	for (loops = 0; loops < RF256_LOOPS; loops++) {
+	loops = sin_scaled(msgh) * 3;
+	for (loop = 0; loop < loops; loop++) {
 		rf256_update(&ctx, in, len);
 		// pad to the next 256 bit boundary
 		rf256_pad256(&ctx);

@@ -138,6 +138,37 @@ void usage(const char *name, int ret)
 	exit(ret);
 }
 
+// validate that the sin() and pow() functions work as expected
+void check_sin()
+{
+	unsigned int i;
+	unsigned int stop;
+	double d;
+	unsigned long sum1, sum5;
+	uint prev1, prev5;
+	uint next1, next5;
+
+	stop = 0x11111;
+	i = -0x11111;
+	prev1 = prev5 = 0;
+	sum1 = sum5 = 0;
+	do {
+		d = i / 16.0;
+		next1 = (int)(sin(d) * 65536.0);
+		next5 = (int)(pow(sin(d), 5) * 65536.0);
+		sum1 += next1 ^ prev1 ^ i;
+		prev1 = next1;
+		sum5 += next5 ^ prev5 ^ i;
+		prev5 = next5;
+		i++;
+	} while (i != stop);
+
+	if (sum1 != 300239689190865 || sum5 != 300239688428374) {
+		printf("sum1=%ld sum5=%ld p1=%u p5=%u d=%f\n",
+		       sum1, sum5, prev1, prev5, d);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	unsigned int loops;
