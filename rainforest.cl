@@ -846,6 +846,58 @@ static void check_sin()
 	}
 }
 
+// validate the reference hash
+int check_hash(__global ulong *rambox)
+{
+	const uchar data[80] =
+		"\x01\x02\x04\x08\x10\x20\x40\x80"
+		"\x01\x03\x05\x09\x11\x21\x41\x81"
+		"\x02\x02\x06\x0A\x12\x22\x42\x82"
+		"\x05\x06\x04\x0C\x14\x24\x44\x84"
+		"\x09\x0A\x0C\x08\x18\x28\x48\x88"
+		"\x11\x12\x14\x18\x10\x30\x50\x90"
+		"\x21\x22\x24\x28\x30\x20\x60\xA0"
+		"\x41\x42\x44\x48\x50\x60\x40\xC0"
+		"\x81\x82\x84\x88\x90\xA0\xC0\x80"
+		"\x18\x24\x42\x81\x99\x66\x55\xAA";
+
+	uchar hash[32];
+
+	rf256_hash(&hash, &data, sizeof(data), rambox, 0);
+
+	printf("[%u] test data:\n"
+	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+	       "   hash:\n"
+	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
+	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n",
+	       get_global_id(0),
+	       data[0x00], data[0x01], data[0x02], data[0x03], data[0x04], data[0x05], data[0x06], data[0x07],
+	       data[0x08], data[0x09], data[0x0a], data[0x0b], data[0x0c], data[0x0d], data[0x0e], data[0x0f],
+	       data[0x10], data[0x11], data[0x12], data[0x13], data[0x14], data[0x15], data[0x16], data[0x17],
+	       data[0x18], data[0x19], data[0x1a], data[0x1b], data[0x1c], data[0x1d], data[0x1e], data[0x1f],
+	       data[0x20], data[0x21], data[0x22], data[0x23], data[0x24], data[0x25], data[0x26], data[0x27],
+	       data[0x28], data[0x29], data[0x2a], data[0x2b], data[0x2c], data[0x2d], data[0x2e], data[0x2f],
+	       data[0x30], data[0x31], data[0x32], data[0x33], data[0x34], data[0x35], data[0x36], data[0x37],
+	       data[0x38], data[0x39], data[0x3a], data[0x3b], data[0x3c], data[0x3d], data[0x3e], data[0x3f],
+	       data[0x40], data[0x41], data[0x42], data[0x43], data[0x44], data[0x45], data[0x46], data[0x47],
+	       data[0x48], data[0x49], data[0x4a], data[0x4b], data[0x4c], data[0x4d], data[0x4e], data[0x4f],
+	       hash[0x00], hash[0x01], hash[0x02], hash[0x03], hash[0x04], hash[0x05], hash[0x06], hash[0x07],
+	       hash[0x08], hash[0x09], hash[0x0a], hash[0x0b], hash[0x0c], hash[0x0d], hash[0x0e], hash[0x0f],
+	       hash[0x10], hash[0x11], hash[0x12], hash[0x13], hash[0x14], hash[0x15], hash[0x16], hash[0x17],
+	       hash[0x18], hash[0x19], hash[0x1a], hash[0x1b], hash[0x1c], hash[0x1d], hash[0x1e], hash[0x1f]);
+}
+
 ////////////////////////// equivalent of rf_cpuminer.c ////////////////////////
 
 #define SWAP4(x) as_uint(as_uchar4(x).wzyx)
@@ -866,7 +918,9 @@ __kernel void search(__global const ulong *input, __global uint *output, __globa
 	// the rambox must be initialized by the first call for each thread
 	if (gid < MAX_GLOBAL_THREADS) {
 		// printf("init glob %u lt %u maxglob=%u\n", gid, get_local_id(0), MAX_GLOBAL_THREADS);
+		//check_sin();
 		rf_raminit(rambox);
+		//check_hash(rambox);
 	}
 
 	((uint16 *)data)[0] = ((__global const uint16 *)input)[0];

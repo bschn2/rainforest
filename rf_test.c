@@ -50,12 +50,19 @@ const uint8_t test_msg[80] =
 	"\x81\x82\x84\x88\x90\xA0\xC0\x80"
 	"\x18\x24\x42\x81\x99\x66\x55\xAA";
 
+/* valid pattern for a single rounds of the test message */
+const uint8_t test_msg_out[32] =
+	"\xad\x43\xe4\x01\x93\xae\xe3\x6e"
+	"\x9f\xcb\x83\x07\x95\x6a\x74\xa3"
+	"\x91\xa7\xf7\xee\x08\x7e\xe5\xe2"
+	"\xe4\x10\x23\x0d\x70\x85\x00\xd5";
+
 /* valid pattern for 256 rounds of the test message */
 const uint8_t test_msg_out256[32] =
-	"\xe9\x43\x23\x27\xfb\x77\xb5\x8a"
-	"\x73\x10\x15\x2a\xea\x75\x16\xef"
-	"\x39\x59\x47\xb9\x8d\x23\xf2\x77"
-	"\x74\x3e\x7c\xa5\x6b\x17\x6c\xf9";
+	"\xb7\x98\x17\x03\xe6\x77\xf5\x98"
+	"\x22\x63\x20\xc8\xfa\x1c\x77\xae"
+	"\xc7\xcc\x06\x54\xb9\x93\x0b\xa2"
+	"\x8a\x52\xba\xed\xee\xba\x55\x63";
 
 void *run_bench(void *rambox)
 {
@@ -241,6 +248,17 @@ int main(int argc, char **argv)
 		 */
 		memcpy(msg, test_msg, sizeof(msg));
 
+		printf("Single hash:\n");
+		rf256_hash(out, msg, sizeof(msg), rambox, NULL);
+		if (memcmp(out, test_msg_out, sizeof(test_msg_out)) != 0) {
+			print256(out, " invalid");
+			print256(test_msg_out, "expected");
+			exit(1);
+		}
+		print256(out, "valid");
+
+		/* try the 256-loop pattern */
+		printf("256-loop hash:\n");
 		for (loops = 0; loops < 256; loops++) {
 			unsigned int i;
 
