@@ -32,6 +32,8 @@ int scanhash_rf256(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *
 	const uint32_t first_nonce = pdata[19];
 	uint32_t nonce = first_nonce;
 	volatile uint8_t *restart = &(work_restart[thr_id].restart);
+	void *rambox;
+	int ret = 0;
 
 	if (opt_benchmark)
 		Htarg = ptarget[7] = 0x0cff;
@@ -42,17 +44,23 @@ int scanhash_rf256(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *
 	for (int k=0; k < 19; k++)
 		be32enc(&endiandata[k], pdata[k]);
 
+	rambox = malloc(RF_RAMBOX_SIZE * 8);
+	if (rambox == NULL)
+		goto out;
+
+	rf_raminit(rambox);
 	// pre-compute the hash state based on the constant part of the header
 
 	do {
 		be32enc(&endiandata[19], nonce);
-		rf256_hash(hash, endiandata, 80);
+		rf256_hash(hash, endiandata, 80, rambox, NULL);
 
 		if (hash[7] <= Htarg && fulltest(hash, ptarget)) {
 			work_set_target_ratio(work, hash);
 			pdata[19] = nonce;
 			*hashes_done = pdata[19] - first_nonce;
-			return 1;
+			ret = 1;
+			goto out;
 		}
 	next:
 		nonce++;
@@ -60,5 +68,7 @@ int scanhash_rf256(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *
 
 	pdata[19] = nonce;
 	*hashes_done = pdata[19] - first_nonce + 1;
-	return 0;
+out:
+	free(rambox);
+	return ret;
 }
