@@ -603,11 +603,28 @@ void rf256_hash2(void *out, const void *in, size_t len, uint32_t seed) {
   rf256_update(&ctx, in, len);
   rf256_final(out, &ctx);
 }
-
+#define RAINFOREST_TEST 1
 #ifdef RAINFOREST_TEST
 static void print256(const uint8_t *b, const char *tag) {
+
+	uint32_t i=0x01234567;
+	uint8_t  endian = ((*((uint8_t*)(&i))) == 0x67);
 	uint64_t* b_64 = (uint64_t*)b;
-  printf("%s: %016jx%016jx.%016jx%016jx",b_64[0],b_64[1],b_64[2],b_64[3]);
+	if(endian){
+		printf("%s: %016jx%016jx.%016jx%016jx\n",tag,b_64[0],b_64[1],b_64[2],b_64[3]);
+	} else {
+		for(uint8_t j=0;j<4;j++){	
+			b_64[j]=   ((b_64[j]&0xff00000000000000ULL)>>56)
+				 | ((b_64[j]&0x00ff000000000000ULL)>>40)
+				 | ((b_64[j]&0x0000ff0000000000ULL)>>24)
+				 | ((b_64[j]&0x000000ff00000000ULL)>> 8)
+				 | ((b_64[j]&0x00000000ff000000ULL)<< 8)
+				 | ((b_64[j]&0x0000000000ff0000ULL)<<24)
+				 | ((b_64[j]&0x000000000000ff00ULL)<<40)
+				 | ((b_64[j]&0x00000000000000ffULL)<<56);
+		}	
+		printf("%s: %016jx%016jx.%016jx%016jx\n",tag,b_64[0],b_64[1],b_64[2],b_64[3]);
+	}
 }
 
 int main(int argc, char **argv) {
