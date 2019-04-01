@@ -146,7 +146,7 @@ void usage(const char *name, int ret)
 }
 
 // validate that the sin() and pow() functions work as expected
-void check_sin()
+int check_sin()
 {
 	unsigned int i;
 	unsigned int stop;
@@ -173,7 +173,9 @@ void check_sin()
 	if (sum1 != 300239689190865 || sum5 != 300239688428374) {
 		printf("sum1=%ld sum5=%ld p1=%u p5=%u d=%f\n",
 		       sum1, sum5, prev1, prev5, d);
+		return 0;
 	}
+	return 1;
 }
 
 int main(int argc, char **argv)
@@ -237,6 +239,9 @@ int main(int argc, char **argv)
 		uint8_t msg[80];
 		uint8_t out[32];
 		void *rambox;
+
+		if (!check_sin())
+			exit(1);
 
 		rambox = malloc(RF_RAMBOX_SIZE * 8);
 		if (rambox == NULL)

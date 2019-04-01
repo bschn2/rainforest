@@ -253,6 +253,16 @@ static inline uint64_t rf_revbit64(uint64_t v)
 	return v;
 }
 
+#if defined(__GNUC__) && (__GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 7) && !defined(__clang__)
+static inline unsigned long __builtin_clrsbl(int64_t x)
+{
+	if (x < 0)
+		return __builtin_clzl(~(x << 1));
+	else
+		return __builtin_clzl(x << 1);
+}
+#endif
+
 // lookup _old_ in _rambox_, update it and perform a substitution if a matching
 // value is found.
 static inline uint32_t rf_rambox(rf256_ctx_t *ctx, uint64_t old)
