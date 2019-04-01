@@ -320,7 +320,7 @@ static inline uint rf_crc32_mem(uint crc, const void *msg, size_t len)
 	return crc;
 }
 
-/////////////////////////////// same as rf_core.c ///////////////////////////
+/////////////////////////////// same as rfv2_core.c ///////////////////////////
 
 // these archs are fine with unaligned reads
 #define RF_UNALIGNED_LE64
@@ -898,7 +898,7 @@ int check_hash(__global ulong *rambox)
 	       hash[0x18], hash[0x19], hash[0x1a], hash[0x1b], hash[0x1c], hash[0x1d], hash[0x1e], hash[0x1f]);
 }
 
-////////////////////////// equivalent of rf_cpuminer.c ////////////////////////
+////////////////////////// equivalent of rfv2_cpuminer.c ////////////////////////
 
 #define SWAP4(x) as_uint(as_uchar4(x).wzyx)
 

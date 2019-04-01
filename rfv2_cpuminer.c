@@ -19,7 +19,7 @@
 #include <unistd.h>
 #endif
 
-#include "rf_core.c"
+#include "rfv2_core.c"
 
 int scanhash_rfv2(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *hashes_done)
 {

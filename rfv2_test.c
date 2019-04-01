@@ -24,7 +24,7 @@
 #endif
 #endif
 
-#include "rf_core.c"
+#include "rfv2_core.c"
 
 // only defined when built with -pthread
 #if defined(_REENTRANT) && defined(PTHREAD_MUTEX_INITIALIZER)
