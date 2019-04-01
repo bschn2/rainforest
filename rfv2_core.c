@@ -34,7 +34,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
-#include "rainforest.h"
+#include "rfv2.h"
 
 // these archs are fine with unaligned reads
 #if defined(__x86_64__)||defined(__aarch64__)
@@ -44,7 +44,7 @@
 #define RF_UNALIGNED_LE32
 #endif
 
-#define RF256_INIT_CRC 20180213
+#define RFV2_INIT_CRC 20180213
 
 #ifndef RF_ALIGN
 #ifdef _MSC_VER
@@ -73,11 +73,11 @@ typedef __attribute__((may_alias)) uint32_t rf_u32;
 typedef __attribute__((may_alias)) uint64_t rf_u64;
 #endif
 
-#define RAMBOX_HIST 1024
+#define RFV2_RAMBOX_HIST 1024
 
 // number of loops run over the initial message. At 19 loops
 // most runs are under 256 changes
-#define RF256_LOOPS 320
+#define RFV2_LOOPS 320
 
 typedef union {
 	rf_u8  b[32];
@@ -86,18 +86,18 @@ typedef union {
 	rf_u64 q[4];
 } rf_hash256_t;
 
-typedef struct RF_ALIGN(16) rf_ctx {
+typedef struct RF_ALIGN(16) rfv2_ctx {
 	uint32_t word;  // LE pending message
 	uint32_t len;   // total message length
 	uint32_t crc;
-	uint32_t changes; // must remain lower than RAMBOX_HIST
+	uint32_t changes; // must remain lower than RFV2_RAMBOX_HIST
 	uint64_t *rambox;
 	uint32_t rb_o;    // rambox offset
 	uint32_t rb_l;    // rambox length
 	rf_hash256_t RF_ALIGN(32) hash;
-	uint32_t hist[RAMBOX_HIST];
-	uint64_t prev[RAMBOX_HIST];
-} rf256_ctx_t;
+	uint32_t hist[RFV2_RAMBOX_HIST];
+	uint64_t prev[RFV2_RAMBOX_HIST];
+} rfv2_ctx_t;
 
 // the table is used as an 8 bit-aligned array of uint64_t for the first word,
 // and as a 16 bit-aligned array of uint64_t for the second word. It is filled
@@ -113,7 +113,7 @@ typedef struct RF_ALIGN(16) rf_ctx {
 //     ref=$(printf $(echo $1|sed 's/\(..\)/\\x\1/g'))
 //   done
 
-static const uint8_t rf_table[256 * 2 + 6] = {
+static const uint8_t rfv2_table[256 * 2 + 6] = {
 	0x8e,0xc1,0xa8,0x04,0x38,0x78,0x7c,0x54,0x29,0x23,0x1b,0x78,0x9f,0xf9,0x27,0x54,
 	0x11,0x78,0x95,0xb6,0xaf,0x78,0x45,0x16,0x2b,0x9e,0x91,0xe8,0x97,0x25,0xf8,0x63,
 	0x82,0x56,0xcf,0x48,0x6f,0x82,0x14,0x0d,0x61,0xbe,0x47,0xd1,0x37,0xee,0x30,0xa9,
@@ -151,8 +151,8 @@ static const uint8_t rf_table[256 * 2 + 6] = {
 	//0xe5,0x6e,0x83,0xe6,0x1a,0xcc,0x4a,0x8b,0xa5,0x28,0x9e,0x50,0x48,0xa9,0xa2,0x6b,
 };
 
-// this is made of the last iteration of the rf_table (18th transformation)
-static const uint8_t rf256_iv[32] = {
+// this is made of the last iteration of the rfv2_table (18th transformation)
+static const uint8_t rfv2_iv[32] = {
 	0x78,0xe9,0x90,0xd3,0xb3,0xc8,0x9b,0x7b,0x0a,0xc4,0x86,0x6e,0x4e,0x38,0xb3,0x6b,
 	0x33,0x68,0x7c,0xed,0x73,0x35,0x4b,0x0a,0x97,0x25,0x4c,0x77,0x7a,0xaa,0x61,0x1b
 };
@@ -191,13 +191,13 @@ static inline uint64_t rf_memr64(const uint8_t *p)
 // return rainforest lower word entry for index
 static inline uint64_t rf_wltable(uint8_t index)
 {
-	return rf_memr64(&rf_table[index]);
+	return rf_memr64(&rfv2_table[index]);
 }
 
 // return rainforest upper word entry for _index_
 static inline uint64_t rf_whtable(uint8_t index)
 {
-	return rf_memr64(&rf_table[index * 2]);
+	return rf_memr64(&rfv2_table[index * 2]);
 }
 
 // rotate left vector _v_ by _bits_ bits
@@ -263,31 +263,6 @@ static inline unsigned long __builtin_clrsbl(int64_t x)
 }
 #endif
 
-// lookup _old_ in _rambox_, update it and perform a substitution if a matching
-// value is found.
-static inline uint32_t rf_rambox(rf256_ctx_t *ctx, uint64_t old)
-{
-	uint64_t *p, k;
-	uint32_t idx;
-
-	k = old;
-	old = rf_add64_crc32(old);
-	old ^= rf_revbit64(k);
-	if (__builtin_clrsbl(old) > 5) {
-		idx = ctx->rb_o + old % ctx->rb_l;
-		p = &ctx->rambox[idx];
-		k = *p;
-		old += rf_rotr64(k, (uint8_t)(old / ctx->rb_l));
-		*p = old;
-		if (ctx->changes < RAMBOX_HIST) {
-			ctx->hist[ctx->changes] = idx;
-			ctx->prev[ctx->changes] = k;
-			ctx->changes++;
-		}
-	}
-	return (uint32_t)old;
-}
-
 // write (_x_,_y_) at cell _cell_ for offset _ofs_
 static inline void rf_w128(uint64_t *cell, size_t ofs, uint64_t x, uint64_t y)
 {
@@ -303,8 +278,33 @@ static inline void rf_w128(uint64_t *cell, size_t ofs, uint64_t x, uint64_t y)
 #endif
 }
 
+// lookup _old_ in _rambox_, update it and perform a substitution if a matching
+// value is found.
+static inline uint32_t rfv2_rambox(rfv2_ctx_t *ctx, uint64_t old)
+{
+	uint64_t *p, k;
+	uint32_t idx;
+
+	k = old;
+	old = rf_add64_crc32(old);
+	old ^= rf_revbit64(k);
+	if (__builtin_clrsbl(old) > 5) {
+		idx = ctx->rb_o + old % ctx->rb_l;
+		p = &ctx->rambox[idx];
+		k = *p;
+		old += rf_rotr64(k, (uint8_t)(old / ctx->rb_l));
+		*p = old;
+		if (ctx->changes < RFV2_RAMBOX_HIST) {
+			ctx->hist[ctx->changes] = idx;
+			ctx->prev[ctx->changes] = k;
+			ctx->changes++;
+		}
+	}
+	return (uint32_t)old;
+}
+
 // initialize the ram box
-static void rf_raminit(void *area)
+static void rfv2_raminit(void *area)
 {
 	uint64_t pat1 = 0x0123456789ABCDEFULL;
 	uint64_t pat2 = 0xFEDCBA9876543210ULL;
@@ -327,7 +327,7 @@ static void rf_raminit(void *area)
 	// What is stored each time is the previous and the rotated blocks,
 	// which only requires one rotate and a register rename.
 
-	for (pos = 0; pos < RF_RAMBOX_SIZE; pos += 16) {
+	for (pos = 0; pos < RFV2_RAMBOX_SIZE; pos += 16) {
 		pat3 = pat1;
 		pat1 = rf_rotr64(pat2, (uint8_t)pat3) + 0x111;
 		rf_w128(rambox + pos, 0, pat1, pat3);
@@ -364,7 +364,7 @@ static void rf_raminit(void *area)
 
 #ifdef RF_DEBUG_RAMBOX
 // verify the ram box
-static void rf_ram_test(const void *area)
+static void rfv2_ram_test(const void *area)
 {
 	uint64_t pat1 = 0x0123456789ABCDEFULL;
 	uint64_t pat2 = 0xFEDCBA9876543210ULL;
@@ -387,7 +387,7 @@ static void rf_ram_test(const void *area)
 	// What is stored each time is the previous and the rotated blocks,
 	// which only requires one rotate and a register rename.
 
-	for (pos = 0; pos < RF_RAMBOX_SIZE; pos += 16) {
+	for (pos = 0; pos < RFV2_RAMBOX_SIZE; pos += 16) {
 		pat3 = pat1;
 		pat1 = rf_rotr64(pat2, (uint8_t)pat3) + 0x111;
 		if (rambox[pos + 0] != pat1)
@@ -457,7 +457,7 @@ static void rf_ram_test(const void *area)
 
 // mix each word with the precision lost from the other one when converting
 // it to an IEEE754 double floating point number.
-static inline void rf256_mix_fp_loss(uint64_t *p, uint64_t *q)
+static inline void rfv2_mix_fp_loss(uint64_t *p, uint64_t *q)
 {
 	uint64_t p0, q0;
 	uint64_t lp, lq;
@@ -471,7 +471,7 @@ static inline void rf256_mix_fp_loss(uint64_t *p, uint64_t *q)
 }
 
 // return p/q into p and rev(rev(q)+p) into q
-static inline void rf256_div_mod(uint64_t *p, uint64_t *q)
+static inline void rfv2_div_mod(uint64_t *p, uint64_t *q)
 {
 	uint64_t x = *p;
 	*p = x / *q;
@@ -480,66 +480,66 @@ static inline void rf256_div_mod(uint64_t *p, uint64_t *q)
 }
 
 // exec the div/mod box. _v0_ and _v1_ must be aligned.
-static inline void rf256_divbox(rf_u64 *v0, rf_u64 *v1)
+static inline void rfv2_divbox(rf_u64 *v0, rf_u64 *v1)
 {
 	uint64_t pl, ql, ph, qh;
 
 	//---- low word ----    ---- high word ----
 	pl = ~*v0;              ph = ~*v1;
 	ql = rf_bswap64(*v0);   qh = rf_bswap64(*v1);
-	rf256_mix_fp_loss(&ql, &qh);
+	rfv2_mix_fp_loss(&ql, &qh);
 
 	if (!pl || !ql)   { pl = ql = 0; }
-	else if (pl > ql) rf256_div_mod(&pl, &ql);
-	else              rf256_div_mod(&ql, &pl);
+	else if (pl > ql) rfv2_div_mod(&pl, &ql);
+	else              rfv2_div_mod(&ql, &pl);
 
 	if (!ph || !qh)   { ph = qh = 0; }
-	else if (ph > qh) rf256_div_mod(&ph, &qh);
-	else              rf256_div_mod(&qh, &ph);
+	else if (ph > qh) rfv2_div_mod(&ph, &qh);
+	else              rfv2_div_mod(&qh, &ph);
 
 	pl += qh;               ph += ql;
 	*v0 -= pl;              *v1 -= ph;
 }
 
 // exec the rotation/add box. _v0_ and _v1_ must be aligned.
-static inline void rf256_rotbox(rf_u64 *v0, rf_u64 *v1, uint8_t b0, uint8_t b1)
+static inline void rfv2_rotbox(rf_u64 *v0, rf_u64 *v1, uint8_t b0, uint8_t b1)
 {
 	uint64_t l, h;
 
 	//---- low word ----       ---- high word ----
 	l   = *v0;                 h   = *v1;
 	l   = rf_rotr64(l, b0);    h   = rf_rotl64(h, b1);
-	rf256_mix_fp_loss(&l, &h);
+	rfv2_mix_fp_loss(&l, &h);
 	l  += rf_wltable(b0);      h  += rf_whtable(b1);
 	b0  = (uint8_t)l;          b1  = (uint8_t)h;
 	l   = rf_rotl64(l, b1);    h   = rf_rotr64(h, b0);
-	rf256_mix_fp_loss(&l, &h);
+	rfv2_mix_fp_loss(&l, &h);
 	b0  = (uint8_t)l;          b1  = (uint8_t)h;
 	l   = rf_rotr64(l, b1);    h   = rf_rotl64(h, b0);
-	rf256_mix_fp_loss(&l, &h);
+	rfv2_mix_fp_loss(&l, &h);
 	*v0 = l;                   *v1 = h;
 }
 
 // mix the current state with the current crc
-static inline uint32_t rf256_scramble(rf256_ctx_t *ctx)
+static inline uint32_t rfv2_scramble(rfv2_ctx_t *ctx)
 {
 	return ctx->crc = rf_crc32x4(ctx->hash.d, ctx->crc);
 }
 
 // mix the state with the crc and the pending text, and update the crc
-static inline void rf256_inject(rf256_ctx_t *ctx)
+static inline void rfv2_inject(rfv2_ctx_t *ctx)
 {
 	ctx->crc =
-		(ctx->len & 3) == 0 ? rf_crc32_32(rf256_scramble(ctx), ctx->word):
-		(ctx->len & 3) == 3 ? rf_crc32_24(rf256_scramble(ctx), ctx->word):
-		(ctx->len & 3) == 2 ? rf_crc32_16(rf256_scramble(ctx), ctx->word):
-		rf_crc32_8(rf256_scramble(ctx), ctx->word);
+		(ctx->len & 3) == 0 ? rf_crc32_32(rfv2_scramble(ctx), ctx->word):
+		(ctx->len & 3) == 3 ? rf_crc32_24(rfv2_scramble(ctx), ctx->word):
+		(ctx->len & 3) == 2 ? rf_crc32_16(rfv2_scramble(ctx), ctx->word):
+		rf_crc32_8(rfv2_scramble(ctx), ctx->word);
 	ctx->word = 0;
 }
 
 // rotate the hash by 32 bits. Not using streaming instructions (SSE/NEON) is
 // faster because the compiler can follow moves an use register renames.
-static inline void rf256_rot32x256(rf_hash256_t *hash)
+static inline void rfv2_rot32x256(rf_hash256_t *hash)
 {
 #if defined(__x86_64__) || defined(__aarch64__) || defined(__ARM_ARCH_7A__)
 	uint32_t t0, t1, t2;
@@ -572,7 +572,7 @@ static inline void rf256_rot32x256(rf_hash256_t *hash)
 }
 
 // encrypt the first 128 bits of the hash using the last 128 bits as the key
-static inline void rf256_aesenc(rf256_ctx_t *ctx)
+static inline void rfv2_aesenc(rfv2_ctx_t *ctx)
 {
 	aes2r_encrypt((uint8_t *)ctx->hash.b, (uint8_t *)ctx->hash.b + 16);
 }
@@ -581,64 +581,64 @@ static inline void rf256_aesenc(rf256_ctx_t *ctx)
 // 128 bits of output, 96 of which overlap with the previous round, and 32
 // of which are new. With 5 rounds or more each output bit depends on every
 // input bit.
-static inline void rf256_one_round(rf256_ctx_t *ctx)
+static inline void rfv2_one_round(rfv2_ctx_t *ctx)
 {
 	uint64_t carry;
 
-	rf256_rot32x256(&ctx->hash);
+	rfv2_rot32x256(&ctx->hash);
 
 	carry = ((uint64_t)ctx->len << 32) + ctx->crc;
-	rf256_scramble(ctx);
-	rf256_divbox(ctx->hash.q, ctx->hash.q + 1);
-	rf256_scramble(ctx);
+	rfv2_scramble(ctx);
+	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
+	rfv2_scramble(ctx);
 
-	carry = rf_rambox(ctx, carry);
-	rf256_rotbox(ctx->hash.q, ctx->hash.q + 1, (uint8_t)(carry), (uint8_t)(carry >> 56));
-	rf256_scramble(ctx);
-	rf256_divbox(ctx->hash.q, ctx->hash.q + 1);
-	rf256_scramble(ctx);
-	rf256_divbox(ctx->hash.q, ctx->hash.q + 1);
-	rf256_scramble(ctx);
+	carry = rfv2_rambox(ctx, carry);
+	rfv2_rotbox(ctx->hash.q, ctx->hash.q + 1, (uint8_t)(carry), (uint8_t)(carry >> 56));
+	rfv2_scramble(ctx);
+	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
+	rfv2_scramble(ctx);
+	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
+	rfv2_scramble(ctx);
 
-	carry = rf_rambox(ctx, carry);
-	rf256_rotbox(ctx->hash.q, ctx->hash.q + 1, (uint8_t)(carry >> 8), (uint8_t)(carry >> 48));
-	rf256_scramble(ctx);
-	rf256_divbox(ctx->hash.q, ctx->hash.q + 1);
-	rf256_scramble(ctx);
-	rf256_divbox(ctx->hash.q, ctx->hash.q + 1);
-	rf256_scramble(ctx);
+	carry = rfv2_rambox(ctx, carry);
+	rfv2_rotbox(ctx->hash.q, ctx->hash.q + 1, (uint8_t)(carry >> 8), (uint8_t)(carry >> 48));
+	rfv2_scramble(ctx);
+	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
+	rfv2_scramble(ctx);
+	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
+	rfv2_scramble(ctx);
 
-	carry = rf_rambox(ctx, carry);
-	rf256_rotbox(ctx->hash.q, ctx->hash.q + 1, (uint8_t)(carry >> 16), (uint8_t)(carry >> 40));
-	rf256_scramble(ctx);
-	rf256_divbox(ctx->hash.q, ctx->hash.q + 1);
-	rf256_scramble(ctx);
-	rf256_divbox(ctx->hash.q, ctx->hash.q + 1);
-	rf256_scramble(ctx);
+	carry = rfv2_rambox(ctx, carry);
+	rfv2_rotbox(ctx->hash.q, ctx->hash.q + 1, (uint8_t)(carry >> 16), (uint8_t)(carry >> 40));
+	rfv2_scramble(ctx);
+	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
+	rfv2_scramble(ctx);
+	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
+	rfv2_scramble(ctx);
 
-	carry = rf_rambox(ctx, carry);
-	rf256_rotbox(ctx->hash.q, ctx->hash.q + 1, (uint8_t)(carry >> 24), (uint8_t)(carry >> 32));
-	rf256_scramble(ctx);
-	rf256_divbox(ctx->hash.q, ctx->hash.q + 1);
-	rf256_inject(ctx);
-	rf256_aesenc(ctx);
-	rf256_scramble(ctx);
+	carry = rfv2_rambox(ctx, carry);
+	rfv2_rotbox(ctx->hash.q, ctx->hash.q + 1, (uint8_t)(carry >> 24), (uint8_t)(carry >> 32));
+	rfv2_scramble(ctx);
+	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
+	rfv2_inject(ctx);
+	rfv2_aesenc(ctx);
+	rfv2_scramble(ctx);
 }
 
 // initialize the hash state
-static void rf256_init(rf256_ctx_t *ctx, uint32_t seed, void *rambox)
+static void rfv2_init(rfv2_ctx_t *ctx, uint32_t seed, void *rambox)
 {
-	memcpy(ctx->hash.b, rf256_iv, sizeof(ctx->hash.b));
+	memcpy(ctx->hash.b, rfv2_iv, sizeof(ctx->hash.b));
 	ctx->crc = seed;
 	ctx->word = ctx->len = 0;
 	ctx->changes = 0;
 	ctx->rb_o = 0;
-	ctx->rb_l = RF_RAMBOX_SIZE;
+	ctx->rb_l = RFV2_RAMBOX_SIZE;
 	ctx->rambox = (uint64_t *)rambox;
 }
 
 // update the hash context _ctx_ with _len_ bytes from message _msg_
-static inline void rf256_update(rf256_ctx_t *ctx, const void *msg, size_t len)
+static inline void rfv2_update(rfv2_ctx_t *ctx, const void *msg, size_t len)
 {
 	const uint8_t *msg8 = (uint8_t *)msg;
 
@@ -647,7 +647,7 @@ static inline void rf256_update(rf256_ctx_t *ctx, const void *msg, size_t len)
 		if (!(ctx->len & 3) && len >= 4) {
 			ctx->word = *(uint32_t *)msg8;
 			ctx->len += 4;
-			rf256_one_round(ctx);
+			rfv2_one_round(ctx);
 			msg8 += 4;
 			len  -= 4;
 			continue;
@@ -656,29 +656,29 @@ static inline void rf256_update(rf256_ctx_t *ctx, const void *msg, size_t len)
 		ctx->word |= ((uint32_t)*msg8++) << (8 * (ctx->len++ & 3));
 		len--;
 		if (!(ctx->len & 3))
-			rf256_one_round(ctx);
+			rfv2_one_round(ctx);
 	}
 }
 
 // pad to the next 256-bit (32 bytes) boundary
-static inline void rf256_pad256(rf256_ctx_t *ctx)
+static inline void rfv2_pad256(rfv2_ctx_t *ctx)
 {
 	const uint8_t pad256[32] = { 0, };
 	uint32_t pad;
 
 	pad = (32 - ctx->len) & 0xF;
 	if (pad)
-		rf256_update(ctx, pad256, pad);
+		rfv2_update(ctx, pad256, pad);
 }
 
 // finalize the hash and copy the result into _out_ if not null (256 bits)
-static inline void rf256_final(void *out, rf256_ctx_t *ctx)
+static inline void rfv2_final(void *out, rfv2_ctx_t *ctx)
 {
 	// always run 4 extra rounds to complete the last 128 bits
-	rf256_one_round(ctx);
-	rf256_one_round(ctx);
-	rf256_one_round(ctx);
-	rf256_one_round(ctx);
+	rfv2_one_round(ctx);
+	rfv2_one_round(ctx);
+	rfv2_one_round(ctx);
+	rfv2_one_round(ctx);
 
 	if (out)
 		memcpy(out, ctx->hash.b, 32);
@@ -693,50 +693,50 @@ static uint8_t sin_scaled(unsigned int x)
 }
 
 // hash _len_ bytes from _in_ into _out_, using _seed_
-// _rambox_ must be either NULL or a pointer to an area RF_RAMBOX_SIZE*8 bytes
-// long preinitialized with rf_rambox_init(). If _rambox_ is NULL but _template_
+// _rambox_ must be either NULL or a pointer to an area RFV2_RAMBOX_SIZE*8 bytes
+// long preinitialized with rfv2_rambox_init(). If _rambox_ is NULL but _template_
 // is set, it will be initialized from this template using memcpy().
 // The function returns 0 on success or -1 on allocation failure if rambox is
 // NULL.
-int rf256_hash2(void *out, const void *in, size_t len, void *rambox, const void *template, uint32_t seed)
+int rfv2_hash2(void *out, const void *in, size_t len, void *rambox, const void *template, uint32_t seed)
 {
-	rf256_ctx_t ctx;
+	rfv2_ctx_t ctx;
 	unsigned int loop, loops;
 	int alloc_rambox = (rambox == NULL);
 	uint32_t msgh;
 
 	if (alloc_rambox) {
-		rambox = malloc(RF_RAMBOX_SIZE * 8);
+		rambox = malloc(RFV2_RAMBOX_SIZE * 8);
 		if (rambox == NULL)
 			return -1;
 
 		if (template)
-			memcpy(rambox, template, RF_RAMBOX_SIZE * 8);
+			memcpy(rambox, template, RFV2_RAMBOX_SIZE * 8);
 		else
-			rf_raminit(rambox);
+			rfv2_raminit(rambox);
 	}
 
-	//rf_ram_test(rambox);
+	//rfv2_ram_test(rambox);
 
-	rf256_init(&ctx, seed, rambox);
+	rfv2_init(&ctx, seed, rambox);
 	msgh = rf_crc32_mem(0, in, len);
 	ctx.rb_o = msgh % (ctx.rb_l / 2);
 	ctx.rb_l = (ctx.rb_l / 2 - ctx.rb_o) * 2;
 
 	loops = sin_scaled(msgh) * 3;
 	for (loop = 0; loop < loops; loop++) {
-		rf256_update(&ctx, in, len);
+		rfv2_update(&ctx, in, len);
 		// pad to the next 256 bit boundary
-		rf256_pad256(&ctx);
+		rfv2_pad256(&ctx);
 	}
 
-	rf256_final(out, &ctx);
+	rfv2_final(out, &ctx);
 
 	if (alloc_rambox)
 		free(rambox);
-	else if (ctx.changes == RAMBOX_HIST) {
+	else if (ctx.changes == RFV2_RAMBOX_HIST) {
 		//printf("changes=%d\n", ctx.changes);
-		rf_raminit(rambox);
+		rfv2_raminit(rambox);
 	}
 	else if (ctx.changes > 0) {
 		//printf("changes=%d\n", ctx.changes);
@@ -745,13 +745,13 @@ int rf256_hash2(void *out, const void *in, size_t len, void *rambox, const void 
 			loops--;
 			ctx.rambox[ctx.hist[loops]] = ctx.prev[loops];
 		} while (loops);
-		//rf_ram_test(rambox);
+		//rfv2_ram_test(rambox);
 	}
 	return 0;
 }
 
 // hash _len_ bytes from _in_ into _out_
-int rf256_hash(void *out, const void *in, size_t len, void *rambox, const void *template)
+int rfv2_hash(void *out, const void *in, size_t len, void *rambox, const void *template)
 {
-	return rf256_hash2(out, in, len, rambox, template, RF256_INIT_CRC);
+	return rfv2_hash2(out, in, len, rambox, template, RFV2_INIT_CRC);
 }

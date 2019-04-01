@@ -24,7 +24,7 @@
 #endif
 #endif
 
-#include "rf_core.c"
+#include "rfv2_core.c"
 
 // only defined when built with -pthread
 #if defined(_REENTRANT) && defined(PTHREAD_MUTEX_INITIALIZER)
@@ -78,7 +78,7 @@ void *run_bench(void *rambox)
 		for (i = 0; i < sizeof(msg) / sizeof(msg[0]); i++)
 			msg[i] ^= loops;
 
-		rf256_hash(out, msg, sizeof(msg), rambox, NULL);
+		rfv2_hash(out, msg, sizeof(msg), rambox, NULL);
 
 		/* the output is reinjected at the beginning of the
 		 * message, before it is modified again.
@@ -230,7 +230,7 @@ int main(int argc, char **argv)
 	if (mode == MODE_MESSAGE) {
 		uint8_t out[32];
 
-		rf256_hash(out, text, strlen(text), NULL, NULL);
+		rfv2_hash(out, text, strlen(text), NULL, NULL);
 		print256(out, "out");
 		exit(0);
 	}
@@ -243,10 +243,10 @@ int main(int argc, char **argv)
 		if (!check_sin())
 			exit(1);
 
-		rambox = malloc(RF_RAMBOX_SIZE * 8);
+		rambox = malloc(RFV2_RAMBOX_SIZE * 8);
 		if (rambox == NULL)
 			exit(1);
-		rf_raminit(rambox);
+		rfv2_raminit(rambox);
 
 		/* preinitialize the message with a complex pattern that
 		 * is easy to recognize.
@@ -254,7 +254,7 @@ int main(int argc, char **argv)
 		memcpy(msg, test_msg, sizeof(msg));
 
 		printf("Single hash:\n");
-		rf256_hash(out, msg, sizeof(msg), rambox, NULL);
+		rfv2_hash(out, msg, sizeof(msg), rambox, NULL);
 		if (memcmp(out, test_msg_out, sizeof(test_msg_out)) != 0) {
 			print256(out, " invalid");
 			print256(test_msg_out, "expected");
@@ -271,7 +271,7 @@ int main(int argc, char **argv)
 			for (i = 0; i < sizeof(msg) / sizeof(msg[0]); i++)
 				msg[i] ^= loops;
 
-			rf256_hash(out, msg, sizeof(msg), rambox, NULL);
+			rfv2_hash(out, msg, sizeof(msg), rambox, NULL);
 
 			/* the output is reinjected at the beginning of the
 			 * message, before it is modified again.
@@ -297,13 +297,13 @@ int main(int argc, char **argv)
 		gettimeofday(&tv_start, NULL);
 
 		for (thr = 0; thr < threads; thr++) {
-			rambox[thr] = malloc(RF_RAMBOX_SIZE * 8);
+			rambox[thr] = malloc(RFV2_RAMBOX_SIZE * 8);
 			if (rambox[thr] == NULL) {
 				printf("Failed to allocate memory for thread %u\n", thr);
 				exit(1);
 			}
 
-			rf_raminit(rambox[thr]);
+			rfv2_raminit(rambox[thr]);
 		}
 
 		signal(SIGALRM, report_bench);
