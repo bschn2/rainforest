@@ -36,7 +36,7 @@ int scanhash_rfv2(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *h
 	int ret = 0;
 
 	if (opt_benchmark)
-		Htarg = ptarget[7] = 0x0cff;
+		Htarg = ptarget[7] = 0x1ffffff;
 
 	//printf("thd%d work=%p htarg=%08x ptarg7=%08x first_nonce=%08x max_nonce=%08x hashes_done=%Lu\n",
 	//       thr_id, work, Htarg, ptarget[7], first_nonce, max_nonce, (unsigned long)*hashes_done);
