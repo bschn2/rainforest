@@ -34,7 +34,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
-#include "rainforest.h"
+#include "rfv2.h"
 
 // these archs are fine with unaligned reads
 #if defined(__x86_64__)||defined(__aarch64__)
