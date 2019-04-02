@@ -759,7 +759,7 @@ static uchar sin_scaled(uint x)
 	return pow(sin(x / 16.0), 5) * 127.0 + 128.0;
 }
 
-static int rfv2_hash2(void *out, const void *in, size_t len, __global void *rambox, __global const void *template, uint seed)
+static int rfv2_hash2(void *out, const void *in, size_t len, __global void *rambox, __global const void *rambox_template, uint seed)
 {
 	rfv2_ctx_t ctx;
 	uint loop, loops;
@@ -772,8 +772,8 @@ static int rfv2_hash2(void *out, const void *in, size_t len, __global void *ramb
 	//	if (rambox == NULL)
 	//		return -1;
 	//
-	//	if (template)
-	//		memcpy(rambox, template, RFV2_RAMBOX_SIZE * 8);
+	//	if (rambox_template)
+	//		memcpy(rambox, rambox_template, RFV2_RAMBOX_SIZE * 8);
 	//	else
 	//		rfv2_raminit(rambox);
 	//}
@@ -810,9 +810,9 @@ static int rfv2_hash2(void *out, const void *in, size_t len, __global void *ramb
 	return 0;
 }
 
-static int rfv2_hash(void *out, const void *in, size_t len, __global void *rambox, __global const void *template)
+static int rfv2_hash(void *out, const void *in, size_t len, __global void *rambox, __global const void *rambox_template)
 {
-	return rfv2_hash2(out, in, len, rambox, template, RFV2_INIT_CRC);
+	return rfv2_hash2(out, in, len, rambox, rambox_template, RFV2_INIT_CRC);
 }
 
 // validate that the sin() and pow() functions work as expected

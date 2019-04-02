@@ -38,7 +38,7 @@
 
 #define RFV2_RAMBOX_SIZE (96*1024*1024/8)
 
-int rfv2_hash(void *out, const void *in, size_t len, void *rambox, const void *template);
-int rfv2_hash2(void *out, const void *in, size_t len, void *rambox, const void *template, uint32_t seed);
+int rfv2_hash(void *out, const void *in, size_t len, void *rambox, const void *rambox_template);
+int rfv2_hash2(void *out, const void *in, size_t len, void *rambox, const void *rambox_template, uint32_t seed);
 
 #endif
