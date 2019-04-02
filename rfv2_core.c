@@ -253,7 +253,7 @@ static inline uint64_t rf_revbit64(uint64_t v)
 	return v;
 }
 
-#if defined(__GNUC__) && (__GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 7) && !defined(__clang__)
+#if defined(__GNUC__) && (__GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 7)
 static inline unsigned long __builtin_clrsbl(int64_t x)
 {
 	if (x < 0)
@@ -694,11 +694,11 @@ static uint8_t sin_scaled(unsigned int x)
 
 // hash _len_ bytes from _in_ into _out_, using _seed_
 // _rambox_ must be either NULL or a pointer to an area RFV2_RAMBOX_SIZE*8 bytes
-// long preinitialized with rfv2_rambox_init(). If _rambox_ is NULL but _template_
-// is set, it will be initialized from this template using memcpy().
+// long preinitialized with rfv2_rambox_init(). If _rambox_ is NULL but _rambox_template_
+// is set, it will be initialized from this rambox_template using memcpy().
 // The function returns 0 on success or -1 on allocation failure if rambox is
 // NULL.
-int rfv2_hash2(void *out, const void *in, size_t len, void *rambox, const void *template, uint32_t seed)
+int rfv2_hash2(void *out, const void *in, size_t len, void *rambox, const void *rambox_template, uint32_t seed)
 {
 	rfv2_ctx_t ctx;
 	unsigned int loop, loops;
@@ -710,8 +710,8 @@ int rfv2_hash2(void *out, const void *in, size_t len, void *rambox, const void *
 		if (rambox == NULL)
 			return -1;
 
-		if (template)
-			memcpy(rambox, template, RFV2_RAMBOX_SIZE * 8);
+		if (rambox_template)
+			memcpy(rambox, rambox_template, RFV2_RAMBOX_SIZE * 8);
 		else
 			rfv2_raminit(rambox);
 	}
@@ -751,7 +751,7 @@ int rfv2_hash2(void *out, const void *in, size_t len, void *rambox, const void *
 }
 
 // hash _len_ bytes from _in_ into _out_
-int rfv2_hash(void *out, const void *in, size_t len, void *rambox, const void *template)
+int rfv2_hash(void *out, const void *in, size_t len, void *rambox, const void *rambox_template)
 {
-	return rfv2_hash2(out, in, len, rambox, template, RFV2_INIT_CRC);
+	return rfv2_hash2(out, in, len, rambox, rambox_template, RFV2_INIT_CRC);
 }
