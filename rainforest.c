@@ -606,7 +606,7 @@ void rf256_hash2(void *out, const void *in, size_t len, uint32_t seed) {
 #ifdef RAINFOREST_TEST
 static void print256(const uint8_t *b, const char *tag) {
 	printf("%s: ",tag);
-	for(uint8_t i=0;i<32;i++) printf("%x",b[i]);
+	for(uint8_t i=0;i<32;i++) printf("%02x",b[i]);
 	printf("\n");
 }
 
