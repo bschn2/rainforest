@@ -152,8 +152,8 @@ int check_sin()
 	unsigned int stop;
 	double d;
 	unsigned long sum1, sum5;
-	uint prev1, prev5;
-	uint next1, next5;
+	uint32_t prev1, prev5;
+	uint32_t next1, next5;
 
 	stop = 0x11111;
 	i = -0x11111;

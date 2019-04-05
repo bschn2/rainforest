@@ -156,8 +156,9 @@ static inline uint64_t rf_crc32_64(uint32_t crc, uint64_t msg)
 /* performs a CRC32 on a memory area */
 static inline uint32_t rf_crc32_mem(uint32_t crc, const void *msg, size_t len)
 {
+	const uint8_t *msg8 = (uint8_t *)msg;
 	while (len--) {
-		crc = rf_crc32_8(crc, *(uint8_t*)msg++);
+		crc = rf_crc32_8(crc, *msg8++);
 	}
 	return crc;
 }
