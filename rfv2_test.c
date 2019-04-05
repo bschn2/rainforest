@@ -52,17 +52,17 @@ const uint8_t test_msg[80] =
 
 /* valid pattern for a single rounds of the test message */
 const uint8_t test_msg_out[32] =
-	"\xad\x43\xe4\x01\x93\xae\xe3\x6e"
-	"\x9f\xcb\x83\x07\x95\x6a\x74\xa3"
-	"\x91\xa7\xf7\xee\x08\x7e\xe5\xe2"
-	"\xe4\x10\x23\x0d\x70\x85\x00\xd5";
+	"\xc4\x22\x65\x35\x6d\xe9\x09\x39"
+	"\xda\xd4\xc1\xda\x00\xe0\xcc\x89"
+	"\xdd\x42\x72\xdc\xc6\xa5\x5e\x24"
+	"\x2a\x29\x30\xe8\xa7\xca\x52\xd2";
 
 /* valid pattern for 256 rounds of the test message */
 const uint8_t test_msg_out256[32] =
-	"\xb7\x98\x17\x03\xe6\x77\xf5\x98"
-	"\x22\x63\x20\xc8\xfa\x1c\x77\xae"
-	"\xc7\xcc\x06\x54\xb9\x93\x0b\xa2"
-	"\x8a\x52\xba\xed\xee\xba\x55\x63";
+	"\xd2\xe6\x7f\x6b\x0b\xa8\xc3\xf2"
+	"\xa1\xbd\x02\xe5\xa2\xf3\x4f\x23"
+	"\x3c\x94\x8c\x10\x1b\x9a\x47\x2f"
+	"\xd8\xe1\x47\xa4\x27\xd6\x5b\x57";
 
 void *run_bench(void *rambox)
 {
@@ -123,13 +123,9 @@ void report_bench(int sig)
 
 static void print256(const uint8_t *b, const char *tag)
 {
-	printf("%s: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
-	       ".%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n",
-	       tag,
-	       b[0],  b[1],  b[2],  b[3],  b[4],  b[5],  b[6],  b[7],
-	       b[8],  b[9],  b[10], b[11], b[12], b[13], b[14], b[15],
-	       b[16], b[17], b[18], b[19], b[20], b[21], b[22], b[23],
-	       b[24], b[25], b[26], b[27], b[28], b[29], b[30], b[31]);
+	printf("%s: ",tag);
+	for(uint8_t i=0;i<32;i++) printf("%02x",b[i]);
+	printf("\n");
 }
 
 void usage(const char *name, int ret)
