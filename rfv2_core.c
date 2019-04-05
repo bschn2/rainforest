@@ -288,7 +288,7 @@ static inline uint32_t rfv2_rambox(rfv2_ctx_t *ctx, uint64_t old)
 	k = old;
 	old = rf_add64_crc32(old);
 	old ^= rf_revbit64(k);
-	if (__builtin_clrsbl(old) > 5) {
+	if (__builtin_clrsbl(old) > 3) {
 		idx = ctx->rb_o + old % ctx->rb_l;
 		p = &ctx->rambox[idx];
 		k = *p;
@@ -680,10 +680,16 @@ static inline void rfv2_final(void *out, rfv2_ctx_t *ctx)
 
 // apply a linear sine to a discrete integer to validate that the platform
 // operates a 100% compliant FP stack. Non-IEEE754 FPU will fail to provide
-// valid values for all inputs. The operation simply is (sin(x/16)^5)*127+128.
+// valid values for all inputs. In order to reduce the variations between
+// large and small values, we offset the value and put it to power 1/2. We
+// use sqrt(x) here instead of pow(x,0.5) because sqrt() usually is quite
+// optimized on CPUs and GPUs for vector length calculations while pow() is
+// generic and may be extremely slow. sqrt() on the other hand requires some
+// extra work to implement right on FPGAs and ASICs. The operation simply
+// becomes round(100*sqrt((sin(x/16)^3)+1)+1.5).
 static uint8_t sin_scaled(unsigned int x)
 {
-	return pow(sin(x / 16.0), 5) * 127.0 + 128.0;
+	return round(100.0 * (sqrt(pow(sin(x / 16.0), 3) + 1.0)) + 1.5);
 }
 
 // hash _len_ bytes from _in_ into _out_, using _seed_
@@ -717,7 +723,7 @@ int rfv2_hash2(void *out, const void *in, size_t len, void *rambox, const void *
 	ctx.rb_o = msgh % (ctx.rb_l / 2);
 	ctx.rb_l = (ctx.rb_l / 2 - ctx.rb_o) * 2;
 
-	loops = sin_scaled(msgh) * 3;
+	loops = sin_scaled(msgh);
 	for (loop = 0; loop < loops; loop++) {
 		rfv2_update(&ctx, in, len);
 		// pad to the next 256 bit boundary
