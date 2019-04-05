@@ -597,21 +597,15 @@ static inline void rfv2_one_round(rfv2_ctx_t *ctx)
 	rfv2_scramble(ctx);
 	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
 	rfv2_scramble(ctx);
-	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
-	rfv2_scramble(ctx);
 
 	carry = rfv2_rambox(ctx, carry);
 	rfv2_rotbox(ctx->hash.q, ctx->hash.q + 1, (uint8_t)(carry >> 8), (uint8_t)(carry >> 48));
 	rfv2_scramble(ctx);
 	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
 	rfv2_scramble(ctx);
-	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
-	rfv2_scramble(ctx);
 
 	carry = rfv2_rambox(ctx, carry);
 	rfv2_rotbox(ctx->hash.q, ctx->hash.q + 1, (uint8_t)(carry >> 16), (uint8_t)(carry >> 40));
-	rfv2_scramble(ctx);
-	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
 	rfv2_scramble(ctx);
 	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
 	rfv2_scramble(ctx);
