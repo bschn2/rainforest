@@ -304,7 +304,7 @@ static inline uint32_t rfv2_rambox(rfv2_ctx_t *ctx, uint64_t old)
 }
 
 // initialize the ram box
-static void rfv2_raminit(void *area)
+void rfv2_raminit(void *area)
 {
 	uint64_t pat1 = 0x0123456789ABCDEFULL;
 	uint64_t pat2 = 0xFEDCBA9876543210ULL;
