@@ -499,6 +499,12 @@ static inline ulong __builtin_clrsbl(long x)
 		return clz(x << 1);
 }
 
+static inline void rf_w128(__global ulong *cell, ulong ofs, ulong x, ulong y)
+{
+	cell[ofs + 0] = x;
+	cell[ofs + 1] = y;
+}
+
 static inline uint rfv2_rambox(rfv2_ctx_t *ctx, ulong old)
 {
 	__global ulong *p;
@@ -508,7 +514,7 @@ static inline uint rfv2_rambox(rfv2_ctx_t *ctx, ulong old)
 	k = old;
 	old = rf_add64_crc32(old);
 	old ^= rf_revbit64(k);
-	if (__builtin_clrsbl(old) > 5) {
+	if (__builtin_clrsbl(old) > 3) {
 		idx = ctx->rb_o + old % ctx->rb_l;
 		p = &ctx->rambox[idx];
 		k = *p;
@@ -521,12 +527,6 @@ static inline uint rfv2_rambox(rfv2_ctx_t *ctx, ulong old)
 		}
 	}
 	return old;
-}
-
-static inline void rf_w128(__global ulong *cell, ulong ofs, ulong x, ulong y)
-{
-	cell[ofs + 0] = x;
-	cell[ofs + 1] = y;
 }
 
 static void rfv2_raminit(__global ulong *rambox)
@@ -678,21 +678,15 @@ static inline void rfv2_one_round(rfv2_ctx_t *ctx)
 	rfv2_scramble(ctx);
 	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
 	rfv2_scramble(ctx);
-	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
-	rfv2_scramble(ctx);
 
 	carry = rfv2_rambox(ctx, carry);
 	rfv2_rotbox(ctx->hash.q, ctx->hash.q + 1, carry >> 8, carry >> 48);
 	rfv2_scramble(ctx);
 	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
 	rfv2_scramble(ctx);
-	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
-	rfv2_scramble(ctx);
 
 	carry = rfv2_rambox(ctx, carry);
 	rfv2_rotbox(ctx->hash.q, ctx->hash.q + 1, carry >> 16, carry >> 40);
-	rfv2_scramble(ctx);
-	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
 	rfv2_scramble(ctx);
 	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
 	rfv2_scramble(ctx);
@@ -756,7 +750,7 @@ static void rfv2_final(void *out, rfv2_ctx_t *ctx)
 
 static uchar sin_scaled(uint x)
 {
-	return pow(sin(x / 16.0), 5) * 127.0 + 128.0;
+	return round(100.0 * (sqrt(pow(sin(x / 16.0), 3) + 1.0)) + 1.5);
 }
 
 static int rfv2_hash2(void *out, const void *in, size_t len, __global void *rambox, __global const void *rambox_template, uint seed)
@@ -785,7 +779,7 @@ static int rfv2_hash2(void *out, const void *in, size_t len, __global void *ramb
 	ctx.rb_o = msgh % (ctx.rb_l / 2);
 	ctx.rb_l = (ctx.rb_l / 2 - ctx.rb_o) * 2;
 
-	loops = sin_scaled(msgh) * 3;
+	loops = sin_scaled(msgh);
 	for (loop = 0; loop < loops; loop++) {
 		rfv2_update(&ctx, in, len);
 		// pad to the next 256 bit boundary
@@ -928,7 +922,7 @@ __kernel void search(__global const ulong *input, __global uint *output, __globa
 
 	rfv2_hash(&hash, &data, 80, rambox, 0);
 
-	if (1 && gid == 0/*0x123456*/) { // only for debugging
+	if (0 && gid == 0/*0x123456*/) { // only for debugging
 		printf("[%u] data:\n"
 		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
 		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
