@@ -460,16 +460,16 @@ static inline ulong rf_rotl64(ulong v, uchar bits)
 #if 1
 	return rotate(v, (ulong)bits);
 #else
-	return (v << bits) | (v >> (64 - bits));
+	return (v << bits) | (v >> (-bits & 63));
 #endif
 }
 
 static inline ulong rf_rotr64(ulong v, uchar bits)
 {
 #if 1
-	return rotate(v, (ulong)(64 - bits));
+	return rotate(v, (ulong)(-bits & 63));
 #else
-	return (v >> bits) | (v << (64 - bits));
+	return (v >> bits) | (v << (-bits & 63));
 #endif
 }
 
