@@ -144,7 +144,7 @@ void usage(const char *name, int ret)
 // validate that the sin() and pow() functions work as expected
 int check_sin()
 {
-	unsigned int i;
+	volatile unsigned int i;
 	unsigned int stop;
 	double d;
 	unsigned long sum1, sum5;
