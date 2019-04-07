@@ -314,8 +314,10 @@ static inline ulong rf_crc32_64(uint crc, ulong msg)
 
 static inline uint rf_crc32_mem(uint crc, const void *msg, size_t len)
 {
+	const uchar *msg8 = (const uchar *)msg;
+
 	while (len--) {
-		crc = rf_crc32_8(crc, *(uchar*)msg++);
+		crc = rf_crc32_8(crc, *msg8++);
 	}
 	return crc;
 }
@@ -458,16 +460,16 @@ static inline ulong rf_rotl64(ulong v, uchar bits)
 #if 1
 	return rotate(v, (ulong)bits);
 #else
-	return (v << bits) | (v >> (64 - bits));
+	return (v << bits) | (v >> (-bits & 63));
 #endif
 }
 
 static inline ulong rf_rotr64(ulong v, uchar bits)
 {
 #if 1
-	return rotate(v, (ulong)(64 - bits));
+	return rotate(v, (ulong)(-bits & 63));
 #else
-	return (v >> bits) | (v << (64 - bits));
+	return (v >> bits) | (v << (-bits & 63));
 #endif
 }
 
@@ -499,6 +501,12 @@ static inline ulong __builtin_clrsbl(long x)
 		return clz(x << 1);
 }
 
+static inline void rf_w128(__global ulong *cell, ulong ofs, ulong x, ulong y)
+{
+	cell[ofs + 0] = x;
+	cell[ofs + 1] = y;
+}
+
 static inline uint rfv2_rambox(rfv2_ctx_t *ctx, ulong old)
 {
 	__global ulong *p;
@@ -508,7 +516,7 @@ static inline uint rfv2_rambox(rfv2_ctx_t *ctx, ulong old)
 	k = old;
 	old = rf_add64_crc32(old);
 	old ^= rf_revbit64(k);
-	if (__builtin_clrsbl(old) > 5) {
+	if (__builtin_clrsbl(old) > 3) {
 		idx = ctx->rb_o + old % ctx->rb_l;
 		p = &ctx->rambox[idx];
 		k = *p;
@@ -521,12 +529,6 @@ static inline uint rfv2_rambox(rfv2_ctx_t *ctx, ulong old)
 		}
 	}
 	return old;
-}
-
-static inline void rf_w128(__global ulong *cell, ulong ofs, ulong x, ulong y)
-{
-	cell[ofs + 0] = x;
-	cell[ofs + 1] = y;
 }
 
 static void rfv2_raminit(__global ulong *rambox)
@@ -678,21 +680,15 @@ static inline void rfv2_one_round(rfv2_ctx_t *ctx)
 	rfv2_scramble(ctx);
 	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
 	rfv2_scramble(ctx);
-	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
-	rfv2_scramble(ctx);
 
 	carry = rfv2_rambox(ctx, carry);
 	rfv2_rotbox(ctx->hash.q, ctx->hash.q + 1, carry >> 8, carry >> 48);
 	rfv2_scramble(ctx);
 	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
 	rfv2_scramble(ctx);
-	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
-	rfv2_scramble(ctx);
 
 	carry = rfv2_rambox(ctx, carry);
 	rfv2_rotbox(ctx->hash.q, ctx->hash.q + 1, carry >> 16, carry >> 40);
-	rfv2_scramble(ctx);
-	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
 	rfv2_scramble(ctx);
 	rfv2_divbox(ctx->hash.q, ctx->hash.q + 1);
 	rfv2_scramble(ctx);
@@ -719,16 +715,18 @@ static void rfv2_init(rfv2_ctx_t *ctx, uint seed, __global void *rambox)
 
 static void rfv2_update(rfv2_ctx_t *ctx, const void *msg, size_t len)
 {
+	const uchar *msg8 = (const uchar *)msg;
+
 	while (len > 0) {
 		if (!(ctx->len & 3) && len >= 4) {
-			ctx->word = *(uint *)msg;
+			ctx->word = *(uint *)msg8;
 			ctx->len += 4;
 			rfv2_one_round(ctx);
-			msg += 4;
+			msg8 += 4;
 			len -= 4;
 			continue;
 		}
-		ctx->word |= ((uint)*(uchar *)msg++) << (8 * (ctx->len++ & 3));
+		ctx->word |= ((uint)*msg8++) << (8 * (ctx->len++ & 3));
 		len--;
 		if (!(ctx->len & 3))
 			rfv2_one_round(ctx);
@@ -756,7 +754,7 @@ static void rfv2_final(void *out, rfv2_ctx_t *ctx)
 
 static uchar sin_scaled(uint x)
 {
-	return pow(sin(x / 16.0), 5) * 127.0 + 128.0;
+	return round(100.0 * (sqrt(pow(sin(x / 16.0), 3) + 1.0)) + 1.5);
 }
 
 static int rfv2_hash2(void *out, const void *in, size_t len, __global void *rambox, __global const void *rambox_template, uint seed)
@@ -785,7 +783,7 @@ static int rfv2_hash2(void *out, const void *in, size_t len, __global void *ramb
 	ctx.rb_o = msgh % (ctx.rb_l / 2);
 	ctx.rb_l = (ctx.rb_l / 2 - ctx.rb_o) * 2;
 
-	loops = sin_scaled(msgh) * 3;
+	loops = sin_scaled(msgh);
 	for (loop = 0; loop < loops; loop++) {
 		rfv2_update(&ctx, in, len);
 		// pad to the next 256 bit boundary
@@ -861,11 +859,24 @@ int check_hash(__global ulong *rambox)
 		"\x81\x82\x84\x88\x90\xA0\xC0\x80"
 		"\x18\x24\x42\x81\x99\x66\x55\xAA";
 
+	const uchar test_msg_out[32] =
+		"\xc4\x22\x65\x35\x6d\xe9\x09\x39"
+		"\xda\xd4\xc1\xda\x00\xe0\xcc\x89"
+		"\xdd\x42\x72\xdc\xc6\xa5\x5e\x24"
+		"\x2a\x29\x30\xe8\xa7\xca\x52\xd2";
+
 	uchar hash[32];
+	int i;
 
 	rfv2_hash(&hash, &data, sizeof(data), rambox, 0);
 
-	printf("[%u] test data:\n"
+	for (i = 0; i < 32 && hash[i] == test_msg_out[i]; i++)
+		;
+
+	if (i == 32)
+		return 1;
+
+	printf("[%u] Invalid hash: test data:\n"
 	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
 	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
 	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
@@ -896,6 +907,7 @@ int check_hash(__global ulong *rambox)
 	       hash[0x08], hash[0x09], hash[0x0a], hash[0x0b], hash[0x0c], hash[0x0d], hash[0x0e], hash[0x0f],
 	       hash[0x10], hash[0x11], hash[0x12], hash[0x13], hash[0x14], hash[0x15], hash[0x16], hash[0x17],
 	       hash[0x18], hash[0x19], hash[0x1a], hash[0x1b], hash[0x1c], hash[0x1d], hash[0x1e], hash[0x1f]);
+	return 0;
 }
 
 ////////////////////////// equivalent of rfv2_cpuminer.c ////////////////////////
@@ -918,9 +930,9 @@ __kernel void search(__global const ulong *input, __global uint *output, __globa
 	// the rambox must be initialized by the first call for each thread
 	if (gid < MAX_GLOBAL_THREADS) {
 		// printf("init glob %u lt %u maxglob=%u\n", gid, get_local_id(0), MAX_GLOBAL_THREADS);
-		//check_sin();
+		check_sin();
 		rfv2_raminit(rambox);
-		//check_hash(rambox);
+		check_hash(rambox);
 	}
 
 	((uint16 *)data)[0] = ((__global const uint16 *)input)[0];
@@ -928,7 +940,7 @@ __kernel void search(__global const ulong *input, __global uint *output, __globa
 
 	rfv2_hash(&hash, &data, 80, rambox, 0);
 
-	if (1 && gid == 0/*0x123456*/) { // only for debugging
+	if (0 && gid == 0/*0x123456*/) { // only for debugging
 		printf("[%u] data:\n"
 		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
 		       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"

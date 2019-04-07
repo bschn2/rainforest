@@ -201,21 +201,31 @@ static inline uint64_t rf_whtable(uint8_t index)
 }
 
 // rotate left vector _v_ by _bits_ bits
-static inline uint64_t rf_rotl64(uint64_t v, uint8_t bits)
+static inline uint64_t rf_rotl64(uint64_t v, uint64_t bits)
 {
-#if !defined(__ARM_ARCH_8A) && !defined(__AARCH64EL__) && !defined(x86_64)
+#if !defined(RF_NOASM) && defined(__x86_64__)
+	__asm__("rol %1, %0" : "+r"(v) : "c"((uint8_t)bits));
+#else
+#if !defined(__ARM_ARCH_8A) && !defined(__x86_64__)
 	bits &= 63;
 #endif
-	return (v << bits) | (v >> (64 - bits));
+	v = (v << bits) | (v >> (-bits & 63));
+#endif
+	return v;
 }
 
 // rotate right vector _v_ by _bits_ bits
-static inline uint64_t rf_rotr64(uint64_t v, uint8_t bits)
+static inline uint64_t rf_rotr64(uint64_t v, uint64_t bits)
 {
-#if !defined(__ARM_ARCH_8A) && !defined(__AARCH64EL__) && !defined(x86_64)
+#if !defined(RF_NOASM) && defined(__x86_64__)
+	__asm__("ror %1, %0" : "+r"(v) : "c"((uint8_t)bits));
+#else
+#if !defined(__ARM_ARCH_8A) && !defined(__x86_64__)
 	bits &= 63;
 #endif
-	return (v >> bits) | (v << (64 - bits));
+	v = (v >> bits) | (v << (-bits & 63));
+#endif
+	return v;
 }
 
 // reverse all bytes in the word _v_
@@ -269,7 +279,7 @@ static inline void rf_w128(uint64_t *cell, size_t ofs, uint64_t x, uint64_t y)
 #if !defined(RF_NOASM) && (defined(__ARM_ARCH_8A) || defined(__AARCH64EL__))
 	// 128 bit at once is faster when exactly two parallelizable instructions are
 	// used between two calls to keep the pipe full.
-	__asm__ volatile("stp %0, %1, [%2,#%3]\n\t"
+	__asm__ volatile("stp %0, %1, [%2,%3]\n\t"
 			 : /* no output */
 			 : "r"(x), "r"(y), "r" (cell), "I" (ofs * 8));
 #else
