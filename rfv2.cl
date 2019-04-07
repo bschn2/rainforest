@@ -855,11 +855,24 @@ int check_hash(__global ulong *rambox)
 		"\x81\x82\x84\x88\x90\xA0\xC0\x80"
 		"\x18\x24\x42\x81\x99\x66\x55\xAA";
 
+	const uchar test_msg_out[32] =
+		"\xc4\x22\x65\x35\x6d\xe9\x09\x39"
+		"\xda\xd4\xc1\xda\x00\xe0\xcc\x89"
+		"\xdd\x42\x72\xdc\xc6\xa5\x5e\x24"
+		"\x2a\x29\x30\xe8\xa7\xca\x52\xd2";
+
 	uchar hash[32];
+	int i;
 
 	rfv2_hash(&hash, &data, sizeof(data), rambox, 0);
 
-	printf("[%u] test data:\n"
+	for (i = 0; i < 32 && hash[i] == test_msg_out[i]; i++)
+		;
+
+	if (i == 32)
+		return 1;
+
+	printf("[%u] Invalid hash: test data:\n"
 	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
 	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
 	       "     %02x %02x %02x %02x %02x %02x %02x %02x\n"
@@ -890,6 +903,7 @@ int check_hash(__global ulong *rambox)
 	       hash[0x08], hash[0x09], hash[0x0a], hash[0x0b], hash[0x0c], hash[0x0d], hash[0x0e], hash[0x0f],
 	       hash[0x10], hash[0x11], hash[0x12], hash[0x13], hash[0x14], hash[0x15], hash[0x16], hash[0x17],
 	       hash[0x18], hash[0x19], hash[0x1a], hash[0x1b], hash[0x1c], hash[0x1d], hash[0x1e], hash[0x1f]);
+	return 0;
 }
 
 ////////////////////////// equivalent of rfv2_cpuminer.c ////////////////////////
@@ -912,9 +926,9 @@ __kernel void search(__global const ulong *input, __global uint *output, __globa
 	// the rambox must be initialized by the first call for each thread
 	if (gid < MAX_GLOBAL_THREADS) {
 		// printf("init glob %u lt %u maxglob=%u\n", gid, get_local_id(0), MAX_GLOBAL_THREADS);
-		//check_sin();
+		check_sin();
 		rfv2_raminit(rambox);
-		//check_hash(rambox);
+		check_hash(rambox);
 	}
 
 	((uint16 *)data)[0] = ((__global const uint16 *)input)[0];
