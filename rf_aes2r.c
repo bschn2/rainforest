@@ -135,7 +135,7 @@ static inline uint32_t sbox(uint32_t in, uint8_t n)
 
 // this version is optimized for exactly two rounds.
 // _state_ must be 16-byte aligned.
-void aes2r_encrypt(uint8_t * state, const uint8_t * key)
+static inline void aes2r_encrypt(uint8_t * state, const uint8_t * key)
 {
 	uint32_t RF_ALIGN(16) key_schedule[12];
 	uint32_t t;

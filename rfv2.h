@@ -35,6 +35,7 @@
 #define RAINFOREST
 
 #include <stdint.h>
+#include <stddef.h>
 
 #define RFV2_RAMBOX_SIZE (96*1024*1024/8)
 
