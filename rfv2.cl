@@ -314,8 +314,10 @@ static inline ulong rf_crc32_64(uint crc, ulong msg)
 
 static inline uint rf_crc32_mem(uint crc, const void *msg, size_t len)
 {
+	const uchar *msg8 = (const uchar *)msg;
+
 	while (len--) {
-		crc = rf_crc32_8(crc, *(uchar*)msg++);
+		crc = rf_crc32_8(crc, *msg8++);
 	}
 	return crc;
 }
@@ -713,16 +715,18 @@ static void rfv2_init(rfv2_ctx_t *ctx, uint seed, __global void *rambox)
 
 static void rfv2_update(rfv2_ctx_t *ctx, const void *msg, size_t len)
 {
+	const uchar *msg8 = (const uchar *)msg;
+
 	while (len > 0) {
 		if (!(ctx->len & 3) && len >= 4) {
-			ctx->word = *(uint *)msg;
+			ctx->word = *(uint *)msg8;
 			ctx->len += 4;
 			rfv2_one_round(ctx);
-			msg += 4;
+			msg8 += 4;
 			len -= 4;
 			continue;
 		}
-		ctx->word |= ((uint)*(uchar *)msg++) << (8 * (ctx->len++ & 3));
+		ctx->word |= ((uint)*msg8++) << (8 * (ctx->len++ & 3));
 		len--;
 		if (!(ctx->len & 3))
 			rfv2_one_round(ctx);
