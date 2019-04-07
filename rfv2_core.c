@@ -201,10 +201,10 @@ static inline uint64_t rf_whtable(uint8_t index)
 }
 
 // rotate left vector _v_ by _bits_ bits
-static inline uint64_t rf_rotl64(uint64_t v, uint8_t bits)
+static inline uint64_t rf_rotl64(uint64_t v, uint64_t bits)
 {
 #if !defined(RF_NOASM) && defined(__x86_64__)
-	__asm__("rol %1, %0" : "+r"(v) : "c"(bits));
+	__asm__("rol %1, %0" : "+r"(v) : "c"((uint8_t)bits));
 #else
 #if !defined(__ARM_ARCH_8A) && !defined(__x86_64__)
 	bits &= 63;
@@ -215,10 +215,10 @@ static inline uint64_t rf_rotl64(uint64_t v, uint8_t bits)
 }
 
 // rotate right vector _v_ by _bits_ bits
-static inline uint64_t rf_rotr64(uint64_t v, uint8_t bits)
+static inline uint64_t rf_rotr64(uint64_t v, uint64_t bits)
 {
 #if !defined(RF_NOASM) && defined(__x86_64__)
-	__asm__("ror %1, %0" : "+r"(v) : "c"(bits));
+	__asm__("ror %1, %0" : "+r"(v) : "c"((uint8_t)bits));
 #else
 #if !defined(__ARM_ARCH_8A) && !defined(__x86_64__)
 	bits &= 63;
