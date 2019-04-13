@@ -147,7 +147,7 @@ int check_sin()
 	volatile unsigned int i;
 	unsigned int stop;
 	double d;
-	unsigned long sum1, sum5;
+	uint64_t sum1, sum5;
 	uint32_t prev1, prev5;
 	uint32_t next1, next5;
 
