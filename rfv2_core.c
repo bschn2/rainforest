@@ -263,7 +263,23 @@ static inline uint64_t rf_revbit64(uint64_t v)
 	return v;
 }
 
-#if defined(__GNUC__) && (__GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 7)
+#if !defined(__GNUC__) || (__GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 7)
+#if !defined(__GNUC__) // also covers clang
+int __builtin_clzl(uint64_t x)
+{
+	uint64_t y;
+	int n = 64;
+
+	y = x >> 32; if (y) { x = y; n -= 32; }
+	y = x >> 16; if (y) { x = y; n -= 16; }
+	y = x >>  8; if (y) { x = y; n -=  8; }
+	y = x >>  4; if (y) { x = y; n -=  4; }
+	y = x >>  2; if (y) { x = y; n -=  2; }
+	y = x >>  1; if (y) { x = y; n -=  1; }
+	return n - x;
+}
+
+#endif
 static inline unsigned long __builtin_clrsbl(int64_t x)
 {
 	if (x < 0)
