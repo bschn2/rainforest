@@ -501,7 +501,9 @@ static inline void rfv2_div_mod(uint64_t *p, uint64_t *q)
 {
 	uint64_t x = *p;
 	*p = x / *q;
+#if !defined(RF_NOASM) && !defined(_MSC_VER)
 	__asm__ volatile("" :: "r"(*p)); // force to place the div first
+#endif
 	*q = rf_revbit64(rf_revbit64(*q)+x);
 }
 
