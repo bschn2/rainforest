@@ -118,6 +118,7 @@ void report_bench(int sig)
 	       (double)work / elapsed,
 	       (double)work / elapsed / (double)threads);
 
+	signal(SIGALRM, report_bench);
 	alarm(1);
 }
 
