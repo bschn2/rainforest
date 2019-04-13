@@ -265,7 +265,7 @@ static inline uint64_t rf_revbit64(uint64_t v)
 
 #if !defined(__GNUC__) || (__GNUC__ < 4 || __GNUC__ == 4 && __GNUC_MINOR__ < 7)
 #if !defined(__GNUC__) // also covers clang
-int __builtin_clzl(uint64_t x)
+int __builtin_clzll(uint64_t x)
 {
 	uint64_t y;
 	int n = 64;
@@ -280,12 +280,12 @@ int __builtin_clzl(uint64_t x)
 }
 
 #endif
-static inline unsigned long __builtin_clrsbl(int64_t x)
+static inline int __builtin_clrsbll(int64_t x)
 {
 	if (x < 0)
-		return __builtin_clzl(~(x << 1));
+		return __builtin_clzll(~(x << 1));
 	else
-		return __builtin_clzl(x << 1);
+		return __builtin_clzll(x << 1);
 }
 #endif
 
@@ -314,7 +314,7 @@ static inline uint32_t rfv2_rambox(rfv2_ctx_t *ctx, uint64_t old)
 	k = old;
 	old = rf_add64_crc32(old);
 	old ^= rf_revbit64(k);
-	if (__builtin_clrsbl(old) > 3) {
+	if (__builtin_clrsbll(old) > 3) {
 		idx = ctx->rb_o + old % ctx->rb_l;
 		p = &ctx->rambox[idx];
 		k = *p;
