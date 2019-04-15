@@ -232,7 +232,7 @@ static inline uint64_t rf_rotr64(uint64_t v, uint64_t bits)
 static inline uint64_t rf_bswap64(uint64_t v)
 {
 #if !defined(RF_NOASM) && defined(__x86_64__) && !defined(_MSC_VER)
-	__asm__("bswap %0":"+r"(v));
+	__asm__("bswapq %0":"+r"(v));
 #elif !defined(RF_NOASM) && defined(__aarch64__)
 	__asm__("rev %0,%0\n":"+r"(v));
 #else
@@ -253,7 +253,7 @@ static inline uint64_t rf_revbit64(uint64_t v)
 	v = ((v & 0xccccccccccccccccULL) >> 2) | ((v & 0x3333333333333333ULL) << 2);
 	v = ((v & 0xf0f0f0f0f0f0f0f0ULL) >> 4) | ((v & 0x0f0f0f0f0f0f0f0fULL) << 4);
 #if !defined(RF_NOASM) && defined(__x86_64__)
-	__asm__("bswap %0" : "=r"(v) : "0"(v));
+	__asm__("bswapq %0" : "=r"(v) : "0"(v));
 #else
 	v = ((v & 0xff00ff00ff00ff00ULL) >> 8)  | ((v & 0x00ff00ff00ff00ffULL) << 8);
 	v = ((v & 0xffff0000ffff0000ULL) >> 16) | ((v & 0x0000ffff0000ffffULL) << 16);
