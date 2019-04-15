@@ -171,8 +171,8 @@ int check_sin()
 	} while (i != stop);
 
 	if (sum1 != 300239689190865ULL || sum5 != 300239688428374ULL) {
-		printf("sum1=%ld sum5=%ld p1=%u p5=%u d=%f\n",
-		       sum1, sum5, prev1, prev5, d);
+		printf("sum1=%lld sum5=%lld p1=%u p5=%u d=%f\n",
+		       (unsigned long long)sum1, (unsigned long long)sum5, prev1, prev5, d);
 		return 0;
 	}
 	return 1;
