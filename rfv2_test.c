@@ -124,8 +124,11 @@ void report_bench(int sig)
 
 static void print256(const uint8_t *b, const char *tag)
 {
+	uint8_t i;
+
 	printf("%s: ",tag);
-	for(uint8_t i=0;i<32;i++) printf("%02x",b[i]);
+	for (i = 0; i < 32;i++)
+		printf("%02x",b[i]);
 	printf("\n");
 }
 
