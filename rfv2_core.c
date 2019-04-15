@@ -249,9 +249,9 @@ static inline uint64_t rf_revbit64(uint64_t v)
 #if !defined(RF_NOASM) && defined(__aarch64__)
 	__asm__ volatile("rbit %0, %1\n" : "=r"(v) : "r"(v));
 #else
-	v = ((v & 0xaaaaaaaaaaaaaaaa) >> 1) | ((v & 0x5555555555555555) << 1);
-	v = ((v & 0xcccccccccccccccc) >> 2) | ((v & 0x3333333333333333) << 2);
-	v = ((v & 0xf0f0f0f0f0f0f0f0) >> 4) | ((v & 0x0f0f0f0f0f0f0f0f) << 4);
+	v = ((v & 0xaaaaaaaaaaaaaaaaULL) >> 1) | ((v & 0x5555555555555555ULL) << 1);
+	v = ((v & 0xccccccccccccccccULL) >> 2) | ((v & 0x3333333333333333ULL) << 2);
+	v = ((v & 0xf0f0f0f0f0f0f0f0ULL) >> 4) | ((v & 0x0f0f0f0f0f0f0f0fULL) << 4);
 #if !defined(RF_NOASM) && defined(__x86_64__)
 	__asm__("bswap %0" : "=r"(v) : "0"(v));
 #else
