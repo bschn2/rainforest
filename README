@@ -1,13 +1,37 @@
-This is the rainforest crypto currency algorithm. It is designed to rebalance the mining power towards the users and not the big
+This is version 2 of the rainforest crypto currency algorithm. It is designed to rebalance the mining power towards the users and not the big
 corporations anymore. It achieves this by being extremely fast on modern 64-bit CPUs including low-power ones such as A53, still
 efficient though not as fast on GPUs, and not affordable to implement at all on FPGAs or ASICs. It makes intensive use of
 pseudo-random in-cache memory accesses and advanced instructions found in modern CPUs like AES, CRC, 64-bit divide, making
 set-top-boxes and smartphones as fast as high-end PCs and as fast as mid-end GPUs.
 
-It was presented and demoed on 2018-04-11 at the crypto-currency conference at Linz (Austria).
+Version 1 was presented and demoed on 2018-04-11 at the crypto-currency conference at Linz (Austria).
 
 Slides were published here : https://www.slideshare.net/bschn2/the-rainforest-algorithm
 
-I was advised to use the MIT license, I'm no expert, if that doesn't suit you, please let me know.
+Version 1 unfortunately suffered by an off-by-one calculation in the padding length resulting in 80-byte
+hashes to be easily optimized. Version 2 fixes this and adds many rounds to prevent this in the future.
+In addition it relies on some floating point operations that are always correct on 100% compliant IEEE-754
+processors and GPUs but are hard to get right on FPGAs and ASICs which will often reduce precision. It also
+uses a 96 MiB large work area which will roughly limit the mining parallelism to 8 threads per GiB of RAM.
+
+It shows decent and homogenous performance on a wide range of hardware, from Raspberry Pi devices to
+octa-core x86 processors and mid-range GPUs. High-end GPUs may not be able to fully exploit all their
+cores if they don't have enough RAM. This is fair since it favors devices using less energy without
+voiding the miners' investment.
+
+This code is released under the MIT license.
+
+All the amazing work and testing leading to version 2 is the result of a massive collaborative
+effort from a nice team of people on GitHub who accepted to suggest, review, test, debug,
+report, deploy, clean up, optimize and improve the code :
+
+   @2acoin, @aivve, @andru-kun, @ClashLuke, @djm34, @endlessloop2,
+   @jdelorme3, @LinuXperia, @MikeMurdo, @wtarreau,
+
+and most particularly @itwysgsl for taking all the risks by using v1 on MicroBitcoin, providing
+detailed feedback and build fixes, and without whom this work would never have started.
+
+Thanks to everyone involved. For fairness between participants I purposely didn't mention
+any full name eventhough some of them have shared them.
 
 Bill.
