@@ -696,7 +696,10 @@ static inline void rfv2_pad256(rfv2_ctx_t *ctx)
 // finalize the hash and copy the result into _out_ if not null (256 bits)
 static inline void rfv2_final(void *out, rfv2_ctx_t *ctx)
 {
-	// always run 4 extra rounds to complete the last 128 bits
+	// always run 5 extra rounds to complete the last 128 bits.
+	// the 5th one is because the last processed block is only in
+	// the ctx and was not mixed yet.
+	rfv2_one_round(ctx);
 	rfv2_one_round(ctx);
 	rfv2_one_round(ctx);
 	rfv2_one_round(ctx);
