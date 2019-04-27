@@ -9,10 +9,7 @@
 // It makes an intensive use of the L1 cache to maintain a heavy intermediary
 // state favoring modern CPUs compared to GPUs (small L1 cache shared by many
 // shaders) or FPGAs (very hard to implement the required low-latency cache)
-// when scanning ranges for nonces. In addition it exploit the perfectly
-// defined precision loss of IEEE754 floating point conversion between int and
-// double to make sure the implementation runs on a perfectly compliant stack
-// and not on a simplified one like an inexpensive IP block. It also uses some
+// when scanning ranges for nonces. It also uses some
 // floating point functions such as sin(), pow() and sqrt() which are available
 // on any GPU but could be wrong if simplified. Finally, it uses 96 MB of work
 // area per thread in order to incur a cost to highly parallel processors such
@@ -488,21 +485,6 @@ static void rfv2_ram_test(const void *area)
 }
 #endif
 
-// mix each word with the precision lost from the other one when converting
-// it to an IEEE754 double floating point number.
-static inline void rfv2_mix_fp_loss(uint64_t *p, uint64_t *q)
-{
-	uint64_t p0, q0;
-	uint64_t lp, lq;
-	double fp, fq;
-
-	p0 = *p;                q0 = *q;
-	fp = p0;                fq = q0;
-	lp = (uint64_t)fp ^ p0; lq = (uint64_t)fq ^ q0;
-	p0 += lq;               q0 += lp;
-	*p = p0;                *q = q0;
-}
-
 // return p/q into p and rev(rev(q)+p) into q
 static inline void rfv2_div_mod(uint64_t *p, uint64_t *q)
 {
@@ -522,7 +504,6 @@ static inline void rfv2_divbox(rf_u64 *v0, rf_u64 *v1)
 	//---- low word ----    ---- high word ----
 	pl = ~*v0;              ph = ~*v1;
 	ql = rf_bswap64(*v0);   qh = rf_bswap64(*v1);
-	rfv2_mix_fp_loss(&ql, &qh);
 
 	if (!pl || !ql)   { pl = ql = 0; }
 	else if (pl > ql) rfv2_div_mod(&pl, &ql);
@@ -544,14 +525,11 @@ static inline void rfv2_rotbox(rf_u64 *v0, rf_u64 *v1, uint8_t b0, uint8_t b1)
 	//---- low word ----       ---- high word ----
 	l   = *v0;                 h   = *v1;
 	l   = rf_rotr64(l, b0);    h   = rf_rotl64(h, b1);
-	rfv2_mix_fp_loss(&l, &h);
 	l  += rf_wltable(b0);      h  += rf_whtable(b1);
 	b0  = (uint8_t)l;          b1  = (uint8_t)h;
 	l   = rf_rotl64(l, b1);    h   = rf_rotr64(h, b0);
-	rfv2_mix_fp_loss(&l, &h);
 	b0  = (uint8_t)l;          b1  = (uint8_t)h;
 	l   = rf_rotr64(l, b1);    h   = rf_rotl64(h, b0);
-	rfv2_mix_fp_loss(&l, &h);
 	*v0 = l;                   *v1 = h;
 }
 

@@ -45,10 +45,7 @@
 // It makes an intensive use of the L1 cache to maintain a heavy intermediary
 // state favoring modern CPUs compared to GPUs (small L1 cache shared by many
 // shaders) or FPGAs (very hard to implement the required low-latency cache)
-// when scanning ranges for nonces. In addition it exploit the perfectly
-// defined precision loss of IEEE754 floating point conversion between int and
-// double to make sure the implementation runs on a perfectly compliant stack
-// and not on a simplified one like an inexpensive IP block. It also uses some
+// when scanning ranges for nonces. It also uses some
 // floating point functions such as sin(), pow() and sqrt() which are available
 // on any GPU but could be wrong if simplified. Finally, it uses 96 MB of work
 // area per thread in order to incur a cost to highly parallel processors such
@@ -580,19 +577,6 @@ static void rfv2_raminit(__global ulong *rambox)
 	}
 }
 
-static inline void rfv2_mix_fp_loss(ulong *p, ulong *q)
-{
-	ulong  p0, q0;
-	ulong  lp, lq;
-	double fp, fq;
-
-	p0 = *p;              q0 = *q;
-	fp = p0;              fq = q0;
-	lp = (ulong)fp ^ p0;  lq = (ulong)fq ^ q0;
-	p0 += lq;             q0 += lp;
-	*p = p0;              *q = q0;
-}
-
 static inline void rfv2_div_mod(ulong *p, ulong *q)
 {
 	ulong x = *p;
@@ -607,7 +591,6 @@ static inline void rfv2_divbox(ulong *v0, ulong *v1)
 	//---- low word ----    ---- high word ----
 	pl = ~*v0;              ph = ~*v1;
 	ql = rf_bswap64(*v0);   qh = rf_bswap64(*v1);
-	rfv2_mix_fp_loss(&ql, &qh);
 
 	if (!pl || !ql)   { pl = ql = 0; }
 	else if (pl > ql) rfv2_div_mod(&pl, &ql);
@@ -628,14 +611,11 @@ static inline void rfv2_rotbox(ulong *v0, ulong *v1, uchar b0, uchar b1)
 	//---- low word ----         ---- high word ----
 	l   = *v0;                   h  = *v1;
 	l   = rf_rotr64(l, b0);      h  = rf_rotl64(h, b1);
-	rfv2_mix_fp_loss(&l, &h);
 	l  += rf_wltable(b0);        h += rf_whtable(b1);
 	b0  = l;                     b1 = h;
 	l   = rf_rotl64(l, b1);      h  = rf_rotr64(h, b0);
-	rfv2_mix_fp_loss(&l, &h);
 	b0  = l;                     b1 = h;
 	l   = rf_rotr64(l, b1);      h  = rf_rotl64(h, b0);
-	rfv2_mix_fp_loss(&l, &h);
 	*v0 = l;                     *v1 = h;
 }
 
@@ -868,10 +848,10 @@ int check_hash(__global ulong *rambox)
 		"\x18\x24\x42\x81\x99\x66\x55\xAA";
 
 	const uchar test_msg_out[32] =
-		"\x7d\xe6\xf6\x0a\xc6\xd2\xf6\xfd"
-		"\xaa\xb9\x6e\x42\xcc\x34\x1c\xee"
-		"\x00\xe0\xcc\x89\xdd\x42\x72\xdc"
-		"\xc6\xa5\x5e\x24\x2a\x29\x30\xe8";
+		"\xb8\x92\x29\x96\xc1\x05\x41\x25"
+		"\x22\x29\x22\x7e\x7c\xbc\x60\x05"
+		"\xa9\x62\xd1\x75\x94\xec\x32\x7c"
+		"\xf2\x25\xcf\x7a\x3e\x7b\x27\x83";
 
 	uchar hash[32];
 	int i;
