@@ -28,7 +28,6 @@
 
 #pragma OPENCL EXTENSION cl_amd_printf : enable
 #pragma OPENCL EXTENSION cl_intel_printf : enable
-#pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
 #ifndef RAINFOREST_CL
 #define RAINFOREST_CL
@@ -45,9 +44,7 @@
 // It makes an intensive use of the L1 cache to maintain a heavy intermediary
 // state favoring modern CPUs compared to GPUs (small L1 cache shared by many
 // shaders) or FPGAs (very hard to implement the required low-latency cache)
-// when scanning ranges for nonces. It also uses some
-// floating point functions such as sin(), pow() and sqrt() which are available
-// on any GPU but could be wrong if simplified. Finally, it uses 96 MB of work
+// when scanning ranges for nonces. Finally, it uses 96 MB of work
 // area per thread in order to incur a cost to highly parallel processors such
 // as high-end GPUs. The purpose is to create a fair balance between all mining
 // equipments, from mobile phones to extreme performance GPUs and to rule out
@@ -56,12 +53,6 @@
 // low-power ARM chips and allows such devices to rival high-end PCs mining
 // performance. Note that CRC32 is not used for security at all, only to
 // disturb data.
-//
-// Tests have shown that mid-range OpenCL GPUs can get the computation right
-// but that low-end ones not implementing 64-bit floats in hardware and
-// falling back to a simplified software stack can't get it right. It was
-// also reported that building this code with -ffast-math results in invalid
-// hashes, as predicted.
 
 /////////////////////////////// same as rf_aes2r.c ///////////////////////////
 
