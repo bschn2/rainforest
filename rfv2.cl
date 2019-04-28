@@ -736,9 +736,14 @@ static void rfv2_final(void *out, rfv2_ctx_t *ctx)
 	*(uint8 *)out = *(uint8 *)ctx->hash.b;
 }
 
-static uchar sin_scaled(uint x)
+static uint sin_scaled(uint x)
 {
-	return round(100.0 * (sqrt(pow(sin(x / 16.0), 3) + 1.0)) + 1.5);
+	int i;
+
+	i = ((x * 42722829) >> 24) - 128;
+	x = 15 * i * i * abs(i);
+	x = (x + (x >> 4)) >> 17;
+	return 257 - x;
 }
 
 static int rfv2_hash2(void *out, const void *in, size_t len, __global void *rambox, __global const void *rambox_template, uint seed)
@@ -813,10 +818,10 @@ int check_hash(__global ulong *rambox)
 		"\x18\x24\x42\x81\x99\x66\x55\xAA";
 
 	const uchar test_msg_out[32] =
-		"\xb8\x92\x29\x96\xc1\x05\x41\x25"
-		"\x22\x29\x22\x7e\x7c\xbc\x60\x05"
-		"\xa9\x62\xd1\x75\x94\xec\x32\x7c"
-		"\xf2\x25\xcf\x7a\x3e\x7b\x27\x83";
+		"\x30\xdf\x4d\x78\xdc\x20\xc9\x81"
+		"\x05\x95\xcc\x5a\x46\xe7\xfa\x4c"
+		"\xfc\xe5\x04\xac\xed\xc7\xfe\x78"
+		"\xbe\xaf\xa8\x72\x62\xb1\x4c\x86";
 
 	uchar hash[32];
 	int i;
