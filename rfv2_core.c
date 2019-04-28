@@ -297,7 +297,7 @@ static inline void rf_w128(uint64_t *cell, size_t ofs, uint64_t x, uint64_t y)
 
 // lookup _old_ in _rambox_, update it and perform a substitution if a matching
 // value is found.
-static inline uint32_t rfv2_rambox(rfv2_ctx_t *ctx, uint64_t old)
+static inline uint64_t rfv2_rambox(rfv2_ctx_t *ctx, uint64_t old)
 {
 	uint64_t *p, k;
 	uint32_t idx;
@@ -317,7 +317,7 @@ static inline uint32_t rfv2_rambox(rfv2_ctx_t *ctx, uint64_t old)
 			ctx->changes++;
 		}
 	}
-	return (uint32_t)old;
+	return old;
 }
 
 // initialize the ram box
