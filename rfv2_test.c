@@ -145,39 +145,6 @@ void usage(const char *name, int ret)
 	exit(ret);
 }
 
-// validate that the sin() and pow() functions work as expected
-int check_sin()
-{
-	volatile unsigned int i;
-	unsigned int stop;
-	double d;
-	uint64_t sum1, sum5;
-	uint32_t prev1, prev5;
-	uint32_t next1, next5;
-
-	stop = 0x11111;
-	i = -0x11111;
-	prev1 = prev5 = 0;
-	sum1 = sum5 = 0;
-	do {
-		d = i / 16.0;
-		next1 = (int)(sin(d) * 65536.0);
-		next5 = (int)(pow(sin(d), 5) * 65536.0);
-		sum1 += next1 ^ prev1 ^ i;
-		prev1 = next1;
-		sum5 += next5 ^ prev5 ^ i;
-		prev5 = next5;
-		i++;
-	} while (i != stop);
-
-	if (sum1 != 300239689190865ULL || sum5 != 300239688428374ULL) {
-		printf("sum1=%lld sum5=%lld p1=%u p5=%u d=%f\n",
-		       (unsigned long long)sum1, (unsigned long long)sum5, prev1, prev5, d);
-		return 0;
-	}
-	return 1;
-}
-
 int main(int argc, char **argv)
 {
 	unsigned int loops;
@@ -239,9 +206,6 @@ int main(int argc, char **argv)
 		uint8_t msg[80];
 		uint8_t out[32];
 		void *rambox;
-
-		if (!check_sin())
-			exit(1);
 
 		rambox = malloc(RFV2_RAMBOX_SIZE * 8);
 		if (rambox == NULL)

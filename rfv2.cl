@@ -801,37 +801,6 @@ static int rfv2_hash(void *out, const void *in, size_t len, __global void *rambo
 	return rfv2_hash2(out, in, len, rambox, rambox_template, RFV2_INIT_CRC);
 }
 
-// validate that the sin() and pow() functions work as expected
-static void check_sin()
-{
-	volatile uint i; // volatile to work around optimisation bug in opencl causing d to receive 1/16 increments
-	uint stop;
-	double d;
-	ulong sum1, sum5;
-	uint prev1, prev5;
-	uint next1, next5;
-
-	stop = 0x11111;
-
-	i = -0x11111;
-	prev1 = prev5 = 0;
-	sum1 = sum5 = 0;
-	do {
-		d = i / 16.0;
-		next1 = (int)(sin(d) * 65536.0);
-		next5 = (int)(pow(sin(d), 5) * 65536.0);
-		sum1 += next1 ^ prev1 ^ i;
-		prev1 = next1;
-		sum5 += next5 ^ prev5 ^ i;
-		prev5 = next5;
-		i++;
-	} while (i != stop);
-
-	if (sum1 != 300239689190865 || sum5 != 300239688428374) {
-		printf("gid=%d sum1=%ld sum5=%ld p1=%u p5=%u d=%f\n", get_global_id(0), sum1, sum5, prev1, prev5, d);
-	}
-}
-
 // validate the reference hash
 int check_hash(__global ulong *rambox)
 {
@@ -918,7 +887,6 @@ __kernel void search(__global const ulong *input, __global uint *output, __globa
 	// the rambox must be initialized by the first call for each thread
 	if (gid < MAX_GLOBAL_THREADS) {
 		// printf("init glob %u lt %u maxglob=%u\n", gid, get_local_id(0), MAX_GLOBAL_THREADS);
-		check_sin();
 		rfv2_raminit(rambox);
 		check_hash(rambox);
 	}
