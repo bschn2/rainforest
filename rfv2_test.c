@@ -52,17 +52,17 @@ const uint8_t test_msg[80] =
 
 /* valid pattern for a single rounds of the test message */
 const uint8_t test_msg_out[32] =
-	"\xb8\x92\x29\x96\xc1\x05\x41\x25"
-	"\x22\x29\x22\x7e\x7c\xbc\x60\x05"
-	"\xa9\x62\xd1\x75\x94\xec\x32\x7c"
-	"\xf2\x25\xcf\x7a\x3e\x7b\x27\x83";
+	"\xde\xe9\xfb\x19\xe4\x50\xc6\x28"
+	"\x35\x98\xe1\x4f\x50\x7a\xb1\xfa"
+	"\xa5\x43\xbc\xfe\xce\xf3\x36\x4f"
+	"\x14\x72\xbd\x33\x06\x01\x87\xeb";
 
 /* valid pattern for 256 rounds of the test message */
 const uint8_t test_msg_out256[32] =
-	"\x19\x54\x44\x9e\xd7\xdd\xa0\x6d"
-	"\x8c\x96\x65\x4b\x3f\x99\xc7\x84"
-	"\x07\x55\xbd\xe5\x4d\xb2\xd5\x32"
-	"\x85\xb6\x17\x87\x5f\x20\x9b\x57";
+	"\x0c\x58\xf3\x0c\x14\xe3\xd4\x30"
+	"\x36\x8a\x31\x26\xcd\xc2\x97\xac"
+	"\x9f\xd7\x07\xd3\xd0\x07\x7d\xed"
+	"\x9a\x32\x6c\xac\x27\x03\x90\xc1";
 
 void *run_bench(void *rambox)
 {
@@ -145,39 +145,6 @@ void usage(const char *name, int ret)
 	exit(ret);
 }
 
-// validate that the sin() and pow() functions work as expected
-int check_sin()
-{
-	volatile unsigned int i;
-	unsigned int stop;
-	double d;
-	uint64_t sum1, sum5;
-	uint32_t prev1, prev5;
-	uint32_t next1, next5;
-
-	stop = 0x11111;
-	i = -0x11111;
-	prev1 = prev5 = 0;
-	sum1 = sum5 = 0;
-	do {
-		d = i / 16.0;
-		next1 = (int)(sin(d) * 65536.0);
-		next5 = (int)(pow(sin(d), 5) * 65536.0);
-		sum1 += next1 ^ prev1 ^ i;
-		prev1 = next1;
-		sum5 += next5 ^ prev5 ^ i;
-		prev5 = next5;
-		i++;
-	} while (i != stop);
-
-	if (sum1 != 300239689190865ULL || sum5 != 300239688428374ULL) {
-		printf("sum1=%lld sum5=%lld p1=%u p5=%u d=%f\n",
-		       (unsigned long long)sum1, (unsigned long long)sum5, prev1, prev5, d);
-		return 0;
-	}
-	return 1;
-}
-
 int main(int argc, char **argv)
 {
 	unsigned int loops;
@@ -239,9 +206,6 @@ int main(int argc, char **argv)
 		uint8_t msg[80];
 		uint8_t out[32];
 		void *rambox;
-
-		if (!check_sin())
-			exit(1);
 
 		rambox = malloc(RFV2_RAMBOX_SIZE * 8);
 		if (rambox == NULL)

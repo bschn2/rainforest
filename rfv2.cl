@@ -28,7 +28,6 @@
 
 #pragma OPENCL EXTENSION cl_amd_printf : enable
 #pragma OPENCL EXTENSION cl_intel_printf : enable
-#pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
 #ifndef RAINFOREST_CL
 #define RAINFOREST_CL
@@ -45,9 +44,7 @@
 // It makes an intensive use of the L1 cache to maintain a heavy intermediary
 // state favoring modern CPUs compared to GPUs (small L1 cache shared by many
 // shaders) or FPGAs (very hard to implement the required low-latency cache)
-// when scanning ranges for nonces. It also uses some
-// floating point functions such as sin(), pow() and sqrt() which are available
-// on any GPU but could be wrong if simplified. Finally, it uses 96 MB of work
+// when scanning ranges for nonces. Finally, it uses 96 MB of work
 // area per thread in order to incur a cost to highly parallel processors such
 // as high-end GPUs. The purpose is to create a fair balance between all mining
 // equipments, from mobile phones to extreme performance GPUs and to rule out
@@ -56,12 +53,6 @@
 // low-power ARM chips and allows such devices to rival high-end PCs mining
 // performance. Note that CRC32 is not used for security at all, only to
 // disturb data.
-//
-// Tests have shown that mid-range OpenCL GPUs can get the computation right
-// but that low-end ones not implementing 64-bit floats in hardware and
-// falling back to a simplified software stack can't get it right. It was
-// also reported that building this code with -ffast-math results in invalid
-// hashes, as predicted.
 
 /////////////////////////////// same as rf_aes2r.c ///////////////////////////
 
@@ -337,11 +328,7 @@ static inline uint rf_crc32_mem(uint crc, const void *msg, size_t len)
 #define RF_ALIGN(x) __attribute__((aligned(x)))
 #endif
 
-#define RFV2_RAMBOX_HIST 1024
-
-// number of loops run over the initial message. At 19 loops
-// most runs are under 256 changes
-#define RFV2_LOOPS 320
+#define RFV2_RAMBOX_HIST 1536
 
 typedef union {
 	uchar  b[32];
@@ -740,9 +727,14 @@ static void rfv2_final(void *out, rfv2_ctx_t *ctx)
 	*(uint8 *)out = *(uint8 *)ctx->hash.b;
 }
 
-static uchar sin_scaled(uint x)
+static uint sin_scaled(uint x)
 {
-	return round(100.0 * (sqrt(pow(sin(x / 16.0), 3) + 1.0)) + 1.5);
+	int i;
+
+	i = ((x * 42722829) >> 24) - 128;
+	x = 15 * i * i * abs(i);
+	x = (x + (x >> 4)) >> 17;
+	return 257 - x;
 }
 
 static int rfv2_hash2(void *out, const void *in, size_t len, __global void *rambox, __global const void *rambox_template, uint seed)
@@ -801,37 +793,6 @@ static int rfv2_hash(void *out, const void *in, size_t len, __global void *rambo
 	return rfv2_hash2(out, in, len, rambox, rambox_template, RFV2_INIT_CRC);
 }
 
-// validate that the sin() and pow() functions work as expected
-static void check_sin()
-{
-	volatile uint i; // volatile to work around optimisation bug in opencl causing d to receive 1/16 increments
-	uint stop;
-	double d;
-	ulong sum1, sum5;
-	uint prev1, prev5;
-	uint next1, next5;
-
-	stop = 0x11111;
-
-	i = -0x11111;
-	prev1 = prev5 = 0;
-	sum1 = sum5 = 0;
-	do {
-		d = i / 16.0;
-		next1 = (int)(sin(d) * 65536.0);
-		next5 = (int)(pow(sin(d), 5) * 65536.0);
-		sum1 += next1 ^ prev1 ^ i;
-		prev1 = next1;
-		sum5 += next5 ^ prev5 ^ i;
-		prev5 = next5;
-		i++;
-	} while (i != stop);
-
-	if (sum1 != 300239689190865 || sum5 != 300239688428374) {
-		printf("gid=%d sum1=%ld sum5=%ld p1=%u p5=%u d=%f\n", get_global_id(0), sum1, sum5, prev1, prev5, d);
-	}
-}
-
 // validate the reference hash
 int check_hash(__global ulong *rambox)
 {
@@ -848,10 +809,10 @@ int check_hash(__global ulong *rambox)
 		"\x18\x24\x42\x81\x99\x66\x55\xAA";
 
 	const uchar test_msg_out[32] =
-		"\xb8\x92\x29\x96\xc1\x05\x41\x25"
-		"\x22\x29\x22\x7e\x7c\xbc\x60\x05"
-		"\xa9\x62\xd1\x75\x94\xec\x32\x7c"
-		"\xf2\x25\xcf\x7a\x3e\x7b\x27\x83";
+		"\xde\xe9\xfb\x19\xe4\x50\xc6\x28"
+		"\x35\x98\xe1\x4f\x50\x7a\xb1\xfa"
+		"\xa5\x43\xbc\xfe\xce\xf3\x36\x4f"
+		"\x14\x72\xbd\x33\x06\x01\x87\xeb";
 
 	uchar hash[32];
 	int i;
@@ -918,7 +879,6 @@ __kernel void search(__global const ulong *input, __global uint *output, __globa
 	// the rambox must be initialized by the first call for each thread
 	if (gid < MAX_GLOBAL_THREADS) {
 		// printf("init glob %u lt %u maxglob=%u\n", gid, get_local_id(0), MAX_GLOBAL_THREADS);
-		check_sin();
 		rfv2_raminit(rambox);
 		check_hash(rambox);
 	}

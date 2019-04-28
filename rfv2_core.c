@@ -9,9 +9,7 @@
 // It makes an intensive use of the L1 cache to maintain a heavy intermediary
 // state favoring modern CPUs compared to GPUs (small L1 cache shared by many
 // shaders) or FPGAs (very hard to implement the required low-latency cache)
-// when scanning ranges for nonces. It also uses some
-// floating point functions such as sin(), pow() and sqrt() which are available
-// on any GPU but could be wrong if simplified. Finally, it uses 96 MB of work
+// when scanning ranges for nonces. Finally, it uses 96 MB of work
 // area per thread in order to incur a cost to highly parallel processors such
 // as high-end GPUs. The purpose is to create a fair balance between all mining
 // equipments, from mobile phones to extreme performance GPUs and to rule out
@@ -21,21 +19,14 @@
 // performance. Note that CRC32 is not used for security at all, only to
 // disturb data.
 //
-// Tests have shown that mid-range OpenCL GPUs can get the computation right
-// but that low-end ones not implementing 64-bit floats in hardware and
-// falling back to a simplified software stack can't get it right. It was
-// also reported that building this code with -ffast-math results in invalid
-// hashes, as predicted.
-//
 // Build instructions on Ubuntu 16.04 to 18.04 :
-//   - on x86:   use gcc -lm -march=native or -maes to enable AES-NI
-//   - on ARMv8: use gcc -lm -march=native or -march=armv8-a+crypto+crc to enable
+//   - on x86:   use gcc -march=native or -maes to enable AES-NI
+//   - on ARMv8: use gcc -march=native or -march=armv8-a+crypto+crc to enable
 //               CRC32 and AES extensions.
 //
 // Note: always use the same options to build all files!
 //
 
-#include <math.h>
 #include <stdint.h>
 #include <string.h>
 #include "rfv2.h"
@@ -77,11 +68,7 @@ typedef __attribute__((may_alias)) uint32_t rf_u32;
 typedef __attribute__((may_alias)) uint64_t rf_u64;
 #endif
 
-#define RFV2_RAMBOX_HIST 1024
-
-// number of loops run over the initial message. At 19 loops
-// most runs are under 256 changes
-#define RFV2_LOOPS 320
+#define RFV2_RAMBOX_HIST 1536
 
 typedef union {
 	rf_u8  b[32];
@@ -694,18 +681,17 @@ static inline void rfv2_final(void *out, rfv2_ctx_t *ctx)
 		memcpy(out, ctx->hash.b, 32);
 }
 
-// apply a linear sine to a discrete integer to validate that the platform
-// operates a 100% compliant FP stack. Non-IEEE754 FPU will fail to provide
-// valid values for all inputs. In order to reduce the variations between
-// large and small values, we offset the value and put it to power 1/2. We
-// use sqrt(x) here instead of pow(x,0.5) because sqrt() usually is quite
-// optimized on CPUs and GPUs for vector length calculations while pow() is
-// generic and may be extremely slow. sqrt() on the other hand requires some
-// extra work to implement right on FPGAs and ASICs. The operation simply
-// becomes round(100*sqrt((sin(x/16)^3)+1)+1.5).
-static uint8_t sin_scaled(unsigned int x)
+// compute an integer-based rough approximation of 1+256*(abs(sin(x/16)^3)+1)
+// which does not depend on a floating point implementation. The period of the
+// input is 2^32.
+static unsigned int sin_scaled(unsigned int x)
 {
-	return round(100.0 * (sqrt(pow(sin(x / 16.0), 3) + 1.0)) + 1.5);
+	int i;
+
+	i = ((x * 42722829) >> 24) - 128;
+	x = 15 * i * i * abs(i);  // 0 to 15<<21
+	x = (x + (x >> 4)) >> 17;
+	return 257 - x;
 }
 
 // hash _len_ bytes from _in_ into _out_, using _seed_
