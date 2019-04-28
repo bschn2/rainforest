@@ -80,11 +80,7 @@ typedef __attribute__((may_alias)) uint32_t rf_u32;
 typedef __attribute__((may_alias)) uint64_t rf_u64;
 #endif
 
-#define RFV2_RAMBOX_HIST 1024
-
-// number of loops run over the initial message. At 19 loops
-// most runs are under 256 changes
-#define RFV2_LOOPS 320
+#define RFV2_RAMBOX_HIST 1536
 
 typedef union {
 	rf_u8  b[32];

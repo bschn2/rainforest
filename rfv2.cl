@@ -340,11 +340,7 @@ static inline uint rf_crc32_mem(uint crc, const void *msg, size_t len)
 #define RF_ALIGN(x) __attribute__((aligned(x)))
 #endif
 
-#define RFV2_RAMBOX_HIST 1024
-
-// number of loops run over the initial message. At 19 loops
-// most runs are under 256 changes
-#define RFV2_LOOPS 320
+#define RFV2_RAMBOX_HIST 1536
 
 typedef union {
 	uchar  b[32];
