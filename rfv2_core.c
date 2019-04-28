@@ -714,18 +714,17 @@ static inline void rfv2_final(void *out, rfv2_ctx_t *ctx)
 		memcpy(out, ctx->hash.b, 32);
 }
 
-// apply a linear sine to a discrete integer to validate that the platform
-// operates a 100% compliant FP stack. Non-IEEE754 FPU will fail to provide
-// valid values for all inputs. In order to reduce the variations between
-// large and small values, we offset the value and put it to power 1/2. We
-// use sqrt(x) here instead of pow(x,0.5) because sqrt() usually is quite
-// optimized on CPUs and GPUs for vector length calculations while pow() is
-// generic and may be extremely slow. sqrt() on the other hand requires some
-// extra work to implement right on FPGAs and ASICs. The operation simply
-// becomes round(100*sqrt((sin(x/16)^3)+1)+1.5).
-static uint8_t sin_scaled(unsigned int x)
+// compute an integer-based rough approximation of (256*(abs(sin(x/16)^3)+1))
+// which does not depend on a floating point implementation. The period of the
+// input is 2^32.
+static unsigned int sin_scaled(unsigned int x)
 {
-	return round(100.0 * (sqrt(pow(sin(x / 16.0), 3) + 1.0)) + 1.5);
+	int i;
+
+	i = ((x * 42722829) >> 24) - 128;
+	x = 15 * i * i * abs(i);  // 0 to 15<<21
+	x = (x + (x >> 4)) >> 17;
+	return 256 - x;
 }
 
 // hash _len_ bytes from _in_ into _out_, using _seed_
