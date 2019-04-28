@@ -1,7 +1,9 @@
 These are patches adding support for the Rainforest algorithm to existing products :
 
 * smhasher-rf256.diff : for SMHasher, to validate the algorithm's robustness
-* cpuminer-multi-134-rf256.diff : this is for version 1.3.4 of this popular CPU miner
+* cpuminer-multi-39fff.diff : this is for commit 39fff of this popular CPU miner
+  => you have to manually copy files rf_aes2r.c, rf_crc32.c, rfv2.h, rfv2_core.c,
+     and rfv2_cpuminer.c verbatim into the "algo" directory
 * sgminer-gm-add-rainforest+precalc.diff : this is for the latest version of this GPU miner
 * yiimp-rainforest.diff : this is for the latest version of this popular server
 
