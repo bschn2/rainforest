@@ -582,6 +582,7 @@ static void rfv2_raminit(__global ulong *rambox)
 
 static inline void rfv2_mix_fp_loss(ulong *p, ulong *q)
 {
+#if 0
 	ulong  p0, q0;
 	ulong  lp, lq;
 	double fp, fq;
@@ -591,6 +592,7 @@ static inline void rfv2_mix_fp_loss(ulong *p, ulong *q)
 	lp = (ulong)fp ^ p0;  lq = (ulong)fq ^ q0;
 	p0 += lq;             q0 += lp;
 	*p = p0;              *q = q0;
+#endif
 }
 
 static inline void rfv2_div_mod(ulong *p, ulong *q)

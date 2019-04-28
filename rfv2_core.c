@@ -492,6 +492,7 @@ static void rfv2_ram_test(const void *area)
 // it to an IEEE754 double floating point number.
 static inline void rfv2_mix_fp_loss(uint64_t *p, uint64_t *q)
 {
+#if 0
 	uint64_t p0, q0;
 	uint64_t lp, lq;
 	double fp, fq;
@@ -501,6 +502,7 @@ static inline void rfv2_mix_fp_loss(uint64_t *p, uint64_t *q)
 	lp = (uint64_t)fp ^ p0; lq = (uint64_t)fq ^ q0;
 	p0 += lq;               q0 += lp;
 	*p = p0;                *q = q0;
+#endif
 }
 
 // return p/q into p and rev(rev(q)+p) into q
