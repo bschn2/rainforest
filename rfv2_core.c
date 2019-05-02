@@ -29,6 +29,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 #include "rfv2.h"
 
 // these archs are fine with unaligned reads
