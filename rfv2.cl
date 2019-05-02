@@ -341,7 +341,8 @@ typedef struct RF_ALIGN(16) rfv2_ctx {
 	uint word;  // LE pending message
 	uint len;   // total message length
 	uint crc;
-	uint changes; // must remain lower than RFV2_RAMBOX_HIST
+	ushort changes; // must remain lower than RFV2_RAMBOX_HIST
+	ushort left_bits; // adjust rambox probability
 	__global ulong *rambox;
 	uint rb_o;    // rambox offset
 	uint rb_l;    // rambox length
@@ -507,7 +508,7 @@ static inline ulong rfv2_rambox(rfv2_ctx_t *ctx, ulong old)
 	k = old;
 	old = rf_add64_crc32(old);
 	old ^= rf_revbit64(k);
-	if (__builtin_clrsbl(old) > 3) {
+	if (__builtin_clrsbl(old) >= ctx->left_bits) {
 		idx = ctx->rb_o + old % ctx->rb_l;
 		p = &ctx->rambox[idx];
 		k = *p;
@@ -764,6 +765,16 @@ static int rfv2_hash2(void *out, const void *in, size_t len, __global void *ramb
 	ctx.rb_l = (ctx.rb_l / 2 - ctx.rb_o) * 2;
 
 	loops = sin_scaled(msgh);
+	if (loops >= 128)
+		ctx.left_bits = 4;
+	else if (loops >= 64)
+		ctx.left_bits = 3;
+	else if (loops >= 32)
+		ctx.left_bits = 2;
+	else if (loops >= 16)
+		ctx.left_bits = 1;
+	else
+		ctx.left_bits = 0;
 	for (loop = 0; loop < loops; loop++) {
 		rfv2_update(&ctx, in, len);
 		// pad to the next 256 bit boundary
@@ -809,10 +820,10 @@ int check_hash(__global ulong *rambox)
 		"\x18\x24\x42\x81\x99\x66\x55\xAA";
 
 	const uchar test_msg_out[32] =
-		"\x23\x7d\xe5\xd2\x97\xcc\x6f\x0b"
-		"\x3c\x65\x5e\xc0\x68\x5e\x9e\x2d"
-		"\x23\xd3\xf1\x8f\x1b\xec\xc1\x70"
-		"\xce\xd0\x06\x8d\x11\xc8\x12\xf1";
+		"\xe9\x46\xdf\xcd\x6b\x29\xc3\x9e"
+		"\xb1\x07\xca\x71\xc4\x5f\xff\xf2"
+		"\xf1\xeb\x47\x30\x5c\x60\x50\xa1"
+		"\x7e\x4c\x5d\x3f\x0a\xd3\x32\xcb";
 
 	uchar hash[32];
 	int i;

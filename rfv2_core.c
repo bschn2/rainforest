@@ -81,7 +81,8 @@ typedef struct RF_ALIGN(16) rfv2_ctx {
 	uint32_t word;  // LE pending message
 	uint32_t len;   // total message length
 	uint32_t crc;
-	uint32_t changes; // must remain lower than RFV2_RAMBOX_HIST
+	uint16_t changes; // must remain lower than RFV2_RAMBOX_HIST
+	uint16_t left_bits; // adjust rambox probability
 	uint64_t *rambox;
 	uint32_t rb_o;    // rambox offset
 	uint32_t rb_l;    // rambox length
@@ -305,7 +306,7 @@ static inline uint64_t rfv2_rambox(rfv2_ctx_t *ctx, uint64_t old)
 	k = old;
 	old = rf_add64_crc32(old);
 	old ^= rf_revbit64(k);
-	if (__builtin_clrsbll(old) > 3) {
+	if (__builtin_clrsbll(old) >= ctx->left_bits) {
 		idx = ctx->rb_o + old % ctx->rb_l;
 		p = &ctx->rambox[idx];
 		k = *p;
@@ -726,6 +727,16 @@ int rfv2_hash2(void *out, const void *in, size_t len, void *rambox, const void *
 	ctx.rb_l = (ctx.rb_l / 2 - ctx.rb_o) * 2;
 
 	loops = sin_scaled(msgh);
+	if (loops >= 128)
+		ctx.left_bits = 4;
+	else if (loops >= 64)
+		ctx.left_bits = 3;
+	else if (loops >= 32)
+		ctx.left_bits = 2;
+	else if (loops >= 16)
+		ctx.left_bits = 1;
+	else
+		ctx.left_bits = 0;
 	for (loop = 0; loop < loops; loop++) {
 		rfv2_update(&ctx, in, len);
 		// pad to the next 256 bit boundary
