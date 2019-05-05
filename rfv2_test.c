@@ -258,8 +258,6 @@ int main(int argc, char **argv)
 		void *rambox[MAXTHREADS] = { NULL, };
 		unsigned int thr;
 
-		gettimeofday(&tv_start, NULL);
-
 		for (thr = 0; thr < threads; thr++) {
 			rambox[thr] = malloc(RFV2_RAMBOX_SIZE * 8);
 			if (rambox[thr] == NULL) {
@@ -269,6 +267,8 @@ int main(int argc, char **argv)
 
 			rfv2_raminit(rambox[thr]);
 		}
+
+		gettimeofday(&tv_start, NULL);
 
 		signal(SIGALRM, report_bench);
 		alarm(1);
