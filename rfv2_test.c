@@ -70,26 +70,35 @@ void *run_bench(void *rambox)
 	unsigned int i;
 	uint8_t msg[80];
 	uint8_t out[32];
+	uint32_t msgh, msgh_init;
 
 	memcpy(msg, test_msg, sizeof(msg));
 
+	msgh_init = rf_crc32_mem(0, msg, sizeof(msg) - 4);
+
 	while (1) {
 		/* modify the message on each loop */
-		for (i = 0; i < sizeof(msg) / sizeof(msg[0]); i++)
-			msg[i] ^= loops;
+		*(uint32_t *)&msg[76] = loops;
 
-		rfv2_hash(out, msg, sizeof(msg), rambox, NULL);
-
-		/* the output is reinjected at the beginning of the
-		 * message, before it is modified again.
-		 */
-		memcpy(msg, out, 32);
-		loops++;
-#if MAXTHREADS > 1
-		__sync_fetch_and_add(&hashes, 1);
+#ifndef RFV2_TRY_ALL_HASHES
+#ifdef RFV2_CRC_FULL_EACH_LOOP
+		msgh = rf_crc32_mem(0, msg, sizeof(msg));
 #else
-		hashes++;
+		msgh = rf_crc32_mem(msgh_init, msg+76, 4);
 #endif
+		if (sin_scaled(msgh) == 2)
+#else
+		if (1)
+#endif
+		{
+			rfv2_hash(out, msg, sizeof(msg), rambox, NULL);
+#if MAXTHREADS > 1
+			__sync_fetch_and_add(&hashes, 1);
+#else
+			hashes++;
+#endif
+		}
+		loops++;
 	}
 	return NULL;
 }
