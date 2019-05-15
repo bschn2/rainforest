@@ -784,18 +784,43 @@ int rfv2_hash(void *out, const void *in, size_t len, void *rambox, const void *r
 int rfv2_scan_hdr(char *msg, void *rambox, uint32_t *hash, uint32_t target, uint32_t min, uint32_t max, volatile char *stop)
 {
 	uint32_t msgh, msgh_init, nonce;
+	rfv2_ctx_t ctx;
 
 	// pre-compute the hash state based on the constant part of the header
 	msgh_init = rf_crc32_mem(0, msg, 76);
 
 	for (nonce = min;; nonce++) {
 		*(uint32_t *)(msg + 76) = htobe32(nonce);
-#ifndef RFV2_TRY_ALL_HASHES
+
 		msgh = rf_crc32_mem(msgh_init, msg + 76, 4);
 		if (sin_scaled(msgh) != 2)
 			goto next;
-#endif
-		rfv2_hash(hash, msg, 80, rambox, NULL);
+
+		rfv2_init(&ctx, RFV2_INIT_CRC, rambox);
+		ctx.rb_o = msgh % (ctx.rb_l / 2);
+		ctx.rb_l = (ctx.rb_l / 2 - ctx.rb_o) * 2;
+
+		/* first loop */
+		rfv2_update(&ctx, msg, 80);
+		rfv2_pad256(&ctx);
+
+		/* second loop */
+		rfv2_update(&ctx, msg, 80);
+		rfv2_pad256(&ctx);
+
+		/* final */
+		rfv2_final(hash, &ctx);
+
+		if (ctx.changes == RFV2_RAMBOX_HIST) {
+			//printf("changes=%d\n", ctx.changes);
+			rfv2_raminit(rambox);
+		}
+		else {
+			while (ctx.changes > 0) {
+				ctx.changes--;
+				ctx.rambox[ctx.hist[ctx.changes]] = ctx.prev[ctx.changes];
+			}
+		}
 
 		if (le32toh(hash[7]) <= target)
 			return 1;
