@@ -150,6 +150,12 @@ static const uint8_t rfv2_iv[32] = {
 	0x33,0x68,0x7c,0xed,0x73,0x35,0x4b,0x0a,0x97,0x25,0x4c,0x77,0x7a,0xaa,0x61,0x1b
 };
 
+/* le32 memory to host representation */
+static inline uint32_t rf_le32toh(uint8_t *x)
+{
+	return x[0] + (x[1] << 8) + (x[2] << 16) + (x[3] << 24);
+}
+
 // mix the current state with the crc and return the new crc
 static inline uint32_t rf_crc32x4(rf_u32 *state, uint32_t crc)
 {
@@ -792,7 +798,10 @@ int rfv2_scan_hdr(char *msg, void *rambox, uint32_t *hash, uint32_t target, uint
 	msgh_init = rf_crc32_mem(0, msg, 76);
 
 	for (nonce = min;; nonce++) {
-		*(uint32_t *)(msg + 76) = htobe32(nonce);
+		msg[76] = nonce >> 24;
+		msg[77] = nonce >> 16;
+		msg[78] = nonce >> 8;
+		msg[79] = nonce;
 
 		msgh = rf_crc32_mem(msgh_init, msg + 76, 4);
 		if (sin_scaled(msgh) != 2)
@@ -815,7 +824,7 @@ int rfv2_scan_hdr(char *msg, void *rambox, uint32_t *hash, uint32_t target, uint
 		/* final */
 		rfv2_final(hash, &ctx);
 
-		if (le32toh(hash[7]) <= target)
+		if (rf_le32toh((uint8_t *)(hash + 7)) <= target)
 			return 1;
 	next:
 		if (nonce == max)
