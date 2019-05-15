@@ -32,7 +32,7 @@ int scanhash_rfv2(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *h
 	const uint32_t first_nonce = pdata[19];
 	uint32_t nonce = first_nonce;
 	volatile uint8_t *restart = &(work_restart[thr_id].restart);
-	void *rambox;
+	static __thread void *rambox;
 	int ret = 0;
 
 	if (opt_benchmark)
@@ -44,11 +44,13 @@ int scanhash_rfv2(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *h
 	for (int k=0; k < 19; k++)
 		be32enc(&endiandata[k], pdata[k]);
 
-	rambox = malloc(RFV2_RAMBOX_SIZE * 8);
-	if (rambox == NULL)
-		goto out;
+	if (!rambox) {
+		rambox = malloc(RFV2_RAMBOX_SIZE * 8);
+		if (rambox == NULL)
+			goto out;
+		rfv2_raminit(rambox);
+	}
 
-	rfv2_raminit(rambox);
 	do {
 		ret = rfv2_scan_hdr((char *)endiandata, rambox, hash, Htarg, nonce, max_nonce, restart);
 		nonce = be32toh(endiandata[19]);
@@ -70,6 +72,5 @@ int scanhash_rfv2(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *h
 	pdata[19] = nonce;
 	*hashes_done = pdata[19] - first_nonce + 1;
 out:
-	free(rambox);
 	return ret;
 }
