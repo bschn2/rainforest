@@ -32,8 +32,7 @@ int scanhash_rfv2(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *h
 	const uint32_t first_nonce = pdata[19];
 	uint32_t nonce = first_nonce;
 	volatile uint8_t *restart = &(work_restart[thr_id].restart);
-	uint32_t msgh, msgh_init;
-	void *rambox;
+	static void *rambox;
 	int ret = 0;
 
 	if (opt_benchmark)
@@ -45,37 +44,52 @@ int scanhash_rfv2(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *h
 	for (int k=0; k < 19; k++)
 		be32enc(&endiandata[k], pdata[k]);
 
-	rambox = malloc(RFV2_RAMBOX_SIZE * 8);
-	if (rambox == NULL)
-		goto out;
+	if (!rambox) {
+		//printf("Rambox not yet initialized\n");
+		if (!thr_id) {
+			/* only thread 0 is responsible for allocating the shared rambox */
+			void *r = malloc(RFV2_RAMBOX_SIZE * 8);
+			if (r == NULL) {
+				//printf("[%d] rambox allocation failed\n", thr_id);
+				*(volatile void **)&rambox = (void*)0x1;
+				goto out;
+			}
+			//printf("Thread %d initializing the rambox\n", thr_id);
+			rfv2_raminit(r);
+			*(volatile void **)&rambox = r;
+		} else {
+			/* wait for thread 0 to finish alloc+init of rambox */
+			//printf("Thread %d waiting for rambox init\n", thr_id);
+			while (!*(volatile void **)&rambox)
+				usleep(100000);
+		}
+	}
 
-	rfv2_raminit(rambox);
-	// pre-compute the hash state based on the constant part of the header
-	msgh_init = rf_crc32_mem(0, endiandata, 76);
+	if (*(volatile void **)&rambox == (void*)0x1) {
+		//printf("[%d] rambox allocation failed\n", thr_id);
+		goto out; // the rambox wasn't properly initialized
+	}
 
 	do {
-		be32enc(&endiandata[19], nonce);
-#ifndef RFV2_TRY_ALL_HASHES
-		msgh = rf_crc32_mem(msgh_init, &endiandata[19], 4);
-		if (sin_scaled(msgh) != 2)
-			goto next;
-#endif
-		rfv2_hash(hash, endiandata, 80, rambox, NULL);
+		ret = rfv2_scan_hdr((char *)endiandata, rambox, hash, Htarg, nonce, max_nonce, restart);
+		nonce = be32toh(endiandata[19]);
+		if (!ret)
+			break;
 
-		if (hash[7] <= Htarg && fulltest(hash, ptarget)) {
+		if (fulltest(hash, ptarget)) {
 			work_set_target_ratio(work, hash);
 			pdata[19] = nonce;
 			*hashes_done = pdata[19] - first_nonce;
-			ret = 1;
 			goto out;
 		}
-	next:
+		else
+			printf("Warning: rfv2_scan_hdr() returned invalid solution %u\n", nonce);
+
 		nonce++;
 	} while (nonce < max_nonce && !(*restart));
 
 	pdata[19] = nonce;
 	*hashes_done = pdata[19] - first_nonce + 1;
 out:
-	free(rambox);
 	return ret;
 }

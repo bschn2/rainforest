@@ -131,6 +131,32 @@ void report_bench(int sig)
 	alarm(1);
 }
 
+/* destructively parse <message> and overwrite it with the hex-decoded contents
+ * then returns the output number of bytes. Upper and lower case hex digits are
+ * used. Non-hex digits are ignored and start a new byte. Incomplete bytes are
+ * skipped.
+ */
+static size_t fromhex(char *message)
+{
+	const char *m = message;
+	char *dst = message;
+	uint8_t n[2];
+	int d;
+	char c;
+
+	for (d = 0; c = *m; m++) {
+		switch (c) {
+			case '0'...'9': n[d^=1] = c - '0';      break;
+			case 'a'...'f': n[d^=1] = c - 'a' + 10; break;
+			case 'A'...'Z': n[d^=1] = c - 'A' + 10; break;
+			default:        d = 0;                  continue;
+		}
+		if (!d)
+			*dst++ = n[1] * 16 + n[0];
+	}
+	return dst - message;
+}
+
 static void print256(const uint8_t *b, const char *tag)
 {
 	uint8_t i;
@@ -149,6 +175,7 @@ void usage(const char *name, int ret)
 	       "  -b           : benchmark mode\n"
 	       "  -c           : validity check mode\n"
 	       "  -m <text>    : hash this text\n"
+	       "  -H <hex>     : hash this block (spaces allowed)\n"
 	       "  -t <threads> : use this number of threads\n"
 	       "\n", name);
 	exit(ret);
@@ -158,12 +185,13 @@ int main(int argc, char **argv)
 {
 	unsigned int loops;
 	const char *name;
-	const char *text;
+	char *text;
 	enum {
 		MODE_NONE = 0,
 		MODE_BENCH,
 		MODE_CHECK,
 		MODE_MESSAGE,
+		MODE_HEX,
 	} mode;
 
 	name = argv[0];
@@ -179,6 +207,12 @@ int main(int argc, char **argv)
 		}
 		else if (!strcmp(*argv, "-m")) {
 			mode = MODE_MESSAGE;
+			if (!--argc)
+				usage(name, 1);
+			text = *++argv;
+		}
+		else if (!strcmp(*argv, "-H")) {
+			mode = MODE_HEX;
 			if (!--argc)
 				usage(name, 1);
 			text = *++argv;
@@ -207,6 +241,17 @@ int main(int argc, char **argv)
 		uint8_t out[32];
 
 		rfv2_hash(out, text, strlen(text), NULL, NULL);
+		print256(out, "out");
+		exit(0);
+	}
+
+	if (mode == MODE_HEX) {
+		uint8_t out[32];
+		size_t len;
+
+		len = fromhex(text);
+		printf("len=%lu\n", (long)len);
+		rfv2_hash(out, text, len, NULL, NULL);
 		print256(out, "out");
 		exit(0);
 	}

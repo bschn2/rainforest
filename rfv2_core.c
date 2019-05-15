@@ -82,7 +82,7 @@ typedef struct RF_ALIGN(16) rfv2_ctx {
 	uint32_t word;  // LE pending message
 	uint32_t len;   // total message length
 	uint32_t crc;
-	uint16_t changes; // must remain lower than RFV2_RAMBOX_HIST
+	uint16_t changes; // must remain lower than RFV2_RAMBOX_HIST, 65535=R/O
 	uint16_t left_bits; // adjust rambox probability
 	uint64_t *rambox;
 	uint32_t rb_o;    // rambox offset
@@ -312,11 +312,13 @@ static inline uint64_t rfv2_rambox(rfv2_ctx_t *ctx, uint64_t old)
 		p = &ctx->rambox[idx];
 		k = *p;
 		old += rf_rotr64(k, (uint8_t)(old / ctx->rb_l));
-		*p = old;
-		if (ctx->changes < RFV2_RAMBOX_HIST) {
-			ctx->hist[ctx->changes] = idx;
-			ctx->prev[ctx->changes] = k;
-			ctx->changes++;
+		if (ctx->changes != 65535) {
+			*p = old;
+			if (ctx->changes < RFV2_RAMBOX_HIST) {
+				ctx->hist[ctx->changes] = idx;
+				ctx->prev[ctx->changes] = k;
+				ctx->changes++;
+			}
 		}
 	}
 	return old;
@@ -768,4 +770,58 @@ int rfv2_hash2(void *out, const void *in, size_t len, void *rambox, const void *
 int rfv2_hash(void *out, const void *in, size_t len, void *rambox, const void *rambox_template)
 {
 	return rfv2_hash2(out, in, len, rambox, rambox_template, RFV2_INIT_CRC);
+}
+
+/* scans nonces from <min> to <max> applying them to message <msg> and stopping
+ * once a hash gives a result at least as good as <target>. It uses <rambox>,
+ * which must have been pre-initialized, and leaves the resulting hash in
+ * <hash> which must contain at least 32 bytes and be 32-bit aligned. It
+ * returns zero if no solution is found, otherwise 1. It only works with 32-bit
+ * aligned 80-byte block headers in big endian format and places the nonce in
+ * big endian format at the end of the message to hash it. In case of success,
+ * the caller has to extract the nonce from the message. It also stops if
+ * <stop> is non-NULL and the location it points to contains a non-null value
+ * (used to interrupt scanning by another thread).
+ */
+int rfv2_scan_hdr(char *msg, void *rambox, uint32_t *hash, uint32_t target, uint32_t min, uint32_t max, volatile char *stop)
+{
+	uint32_t msgh, msgh_init, nonce;
+	rfv2_ctx_t ctx;
+
+	// pre-compute the hash state based on the constant part of the header
+	msgh_init = rf_crc32_mem(0, msg, 76);
+
+	for (nonce = min;; nonce++) {
+		*(uint32_t *)(msg + 76) = htobe32(nonce);
+
+		msgh = rf_crc32_mem(msgh_init, msg + 76, 4);
+		if (sin_scaled(msgh) != 2)
+			goto next;
+
+		rfv2_init(&ctx, RFV2_INIT_CRC, rambox);
+		ctx.changes = 65535; // mark the rambox read-only
+
+		ctx.rb_o = msgh % (ctx.rb_l / 2);
+		ctx.rb_l = (ctx.rb_l / 2 - ctx.rb_o) * 2;
+
+		/* first loop */
+		rfv2_update(&ctx, msg, 80);
+		rfv2_pad256(&ctx);
+
+		/* second loop */
+		rfv2_update(&ctx, msg, 80);
+		rfv2_pad256(&ctx);
+
+		/* final */
+		rfv2_final(hash, &ctx);
+
+		if (le32toh(hash[7]) <= target)
+			return 1;
+	next:
+		if (nonce == max)
+			return 0;
+
+		if (stop && *stop)
+			return 0;
+	}
 }
