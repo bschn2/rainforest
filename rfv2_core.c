@@ -769,3 +769,41 @@ int rfv2_hash(void *out, const void *in, size_t len, void *rambox, const void *r
 {
 	return rfv2_hash2(out, in, len, rambox, rambox_template, RFV2_INIT_CRC);
 }
+
+/* scans nonces from <min> to <max> applying them to message <msg> and stopping
+ * once a hash gives a result at least as good as <target>. It uses <rambox>,
+ * which must have been pre-initialized, and leaves the resulting hash in
+ * <hash> which must contain at least 32 bytes and be 32-bit aligned. It
+ * returns zero if no solution is found, otherwise 1. It only works with 32-bit
+ * aligned 80-byte block headers in big endian format and places the nonce in
+ * big endian format at the end of the message to hash it. In case of success,
+ * the caller has to extract the nonce from the message. It also stops if
+ * <stop> is non-NULL and the location it points to contains a non-null value
+ * (used to interrupt scanning by another thread).
+ */
+int rfv2_scan_hdr(char *msg, void *rambox, uint32_t *hash, uint32_t target, uint32_t min, uint32_t max, volatile char *stop)
+{
+	uint32_t msgh, msgh_init, nonce;
+
+	// pre-compute the hash state based on the constant part of the header
+	msgh_init = rf_crc32_mem(0, msg, 76);
+
+	for (nonce = min;; nonce++) {
+		*(uint32_t *)(msg + 76) = htobe32(nonce);
+#ifndef RFV2_TRY_ALL_HASHES
+		msgh = rf_crc32_mem(msgh_init, msg + 76, 4);
+		if (sin_scaled(msgh) != 2)
+			goto next;
+#endif
+		rfv2_hash(hash, msg, 80, rambox, NULL);
+
+		if (le32toh(hash[7]) <= target)
+			return 1;
+	next:
+		if (nonce == max)
+			return 0;
+
+		if (stop && *stop)
+			return 0;
+	}
+}
