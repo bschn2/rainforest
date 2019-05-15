@@ -32,7 +32,7 @@ int scanhash_rfv2(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *h
 	const uint32_t first_nonce = pdata[19];
 	uint32_t nonce = first_nonce;
 	volatile uint8_t *restart = &(work_restart[thr_id].restart);
-	static __thread void *rambox;
+	static void *rambox;
 	int ret = 0;
 
 	if (opt_benchmark)
@@ -45,10 +45,29 @@ int scanhash_rfv2(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *h
 		be32enc(&endiandata[k], pdata[k]);
 
 	if (!rambox) {
-		rambox = malloc(RFV2_RAMBOX_SIZE * 8);
-		if (rambox == NULL)
-			goto out;
-		rfv2_raminit(rambox);
+		//printf("Rambox not yet initialized\n");
+		if (!thr_id) {
+			/* only thread 0 is responsible for allocating the shared rambox */
+			void *r = malloc(RFV2_RAMBOX_SIZE * 8);
+			if (r == NULL) {
+				//printf("[%d] rambox allocation failed\n", thr_id);
+				*(volatile void **)&rambox = (void*)0x1;
+				goto out;
+			}
+			//printf("Thread %d initializing the rambox\n", thr_id);
+			rfv2_raminit(r);
+			*(volatile void **)&rambox = r;
+		} else {
+			/* wait for thread 0 to finish alloc+init of rambox */
+			//printf("Thread %d waiting for rambox init\n", thr_id);
+			while (!*(volatile void **)&rambox)
+				usleep(100000);
+		}
+	}
+
+	if (*(volatile void **)&rambox == (void*)0x1) {
+		//printf("[%d] rambox allocation failed\n", thr_id);
+		goto out; // the rambox wasn't properly initialized
 	}
 
 	do {
