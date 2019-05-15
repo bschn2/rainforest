@@ -82,7 +82,7 @@ typedef struct RF_ALIGN(16) rfv2_ctx {
 	uint32_t word;  // LE pending message
 	uint32_t len;   // total message length
 	uint32_t crc;
-	uint16_t changes; // must remain lower than RFV2_RAMBOX_HIST
+	uint16_t changes; // must remain lower than RFV2_RAMBOX_HIST, 65535=R/O
 	uint16_t left_bits; // adjust rambox probability
 	uint64_t *rambox;
 	uint32_t rb_o;    // rambox offset
@@ -312,11 +312,13 @@ static inline uint64_t rfv2_rambox(rfv2_ctx_t *ctx, uint64_t old)
 		p = &ctx->rambox[idx];
 		k = *p;
 		old += rf_rotr64(k, (uint8_t)(old / ctx->rb_l));
-		*p = old;
-		if (ctx->changes < RFV2_RAMBOX_HIST) {
-			ctx->hist[ctx->changes] = idx;
-			ctx->prev[ctx->changes] = k;
-			ctx->changes++;
+		if (ctx->changes != 65535) {
+			*p = old;
+			if (ctx->changes < RFV2_RAMBOX_HIST) {
+				ctx->hist[ctx->changes] = idx;
+				ctx->prev[ctx->changes] = k;
+				ctx->changes++;
+			}
 		}
 	}
 	return old;
@@ -797,6 +799,8 @@ int rfv2_scan_hdr(char *msg, void *rambox, uint32_t *hash, uint32_t target, uint
 			goto next;
 
 		rfv2_init(&ctx, RFV2_INIT_CRC, rambox);
+		ctx.changes = 65535; // mark the rambox read-only
+
 		ctx.rb_o = msgh % (ctx.rb_l / 2);
 		ctx.rb_l = (ctx.rb_l / 2 - ctx.rb_o) * 2;
 
@@ -810,17 +814,6 @@ int rfv2_scan_hdr(char *msg, void *rambox, uint32_t *hash, uint32_t target, uint
 
 		/* final */
 		rfv2_final(hash, &ctx);
-
-		if (ctx.changes == RFV2_RAMBOX_HIST) {
-			//printf("changes=%d\n", ctx.changes);
-			rfv2_raminit(rambox);
-		}
-		else {
-			while (ctx.changes > 0) {
-				ctx.changes--;
-				ctx.rambox[ctx.hist[ctx.changes]] = ctx.prev[ctx.changes];
-			}
-		}
 
 		if (le32toh(hash[7]) <= target)
 			return 1;
