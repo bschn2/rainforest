@@ -32,7 +32,6 @@ int scanhash_rfv2(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *h
 	const uint32_t first_nonce = pdata[19];
 	uint32_t nonce = first_nonce;
 	volatile uint8_t *restart = &(work_restart[thr_id].restart);
-	uint32_t msgh, msgh_init;
 	void *rambox;
 	int ret = 0;
 
@@ -50,26 +49,21 @@ int scanhash_rfv2(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *h
 		goto out;
 
 	rfv2_raminit(rambox);
-	// pre-compute the hash state based on the constant part of the header
-	msgh_init = rf_crc32_mem(0, endiandata, 76);
-
 	do {
-		be32enc(&endiandata[19], nonce);
-#ifndef RFV2_TRY_ALL_HASHES
-		msgh = rf_crc32_mem(msgh_init, &endiandata[19], 4);
-		if (sin_scaled(msgh) != 2)
-			goto next;
-#endif
-		rfv2_hash(hash, endiandata, 80, rambox, NULL);
+		ret = rfv2_scan_hdr((char *)endiandata, rambox, hash, Htarg, nonce, max_nonce, restart);
+		nonce = be32toh(endiandata[19]);
+		if (!ret)
+			break;
 
-		if (hash[7] <= Htarg && fulltest(hash, ptarget)) {
+		if (fulltest(hash, ptarget)) {
 			work_set_target_ratio(work, hash);
 			pdata[19] = nonce;
 			*hashes_done = pdata[19] - first_nonce;
-			ret = 1;
 			goto out;
 		}
-	next:
+		else
+			printf("Warning: rfv2_scan_hdr() returned invalid solution %u\n", nonce);
+
 		nonce++;
 	} while (nonce < max_nonce && !(*restart));
 
