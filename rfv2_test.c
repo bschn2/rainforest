@@ -64,41 +64,56 @@ const uint8_t test_msg_out256[32] =
 	"\xc0\xf3\xa2\x0e\x74\xcd\x6f\x6c"
 	"\x02\x5d\x75\xc2\x2c\x45\x99\x60";
 
+/* this is a copy of rfv2_scan_hdr() which performs the exact same operations
+ * except that it doesn't have a target, min/max nonce, nor a stop condition.
+ * it never returns.
+ */
 void *run_bench(void *rambox)
 {
 	unsigned int loops = 0;
 	unsigned int i;
 	uint8_t msg[80];
-	uint8_t out[32];
 	uint32_t msgh, msgh_init;
+	uint32_t nonce;
+	rfv2_ctx_t ctx;
 
 	memcpy(msg, test_msg, sizeof(msg));
 
+	// pre-compute the hash state based on the constant part of the header
 	msgh_init = rf_crc32_mem(0, msg, sizeof(msg) - 4);
 
-	while (1) {
-		/* modify the message on each loop */
-		*(uint32_t *)&msg[76] = loops;
+	for (nonce = 0;; nonce++) {
+		msg[76] = nonce >> 24;
+		msg[77] = nonce >> 16;
+		msg[78] = nonce >> 8;
+		msg[79] = nonce;
 
-#ifndef RFV2_TRY_ALL_HASHES
-#ifdef RFV2_CRC_FULL_EACH_LOOP
-		msgh = rf_crc32_mem(0, msg, sizeof(msg));
-#else
-		msgh = rf_crc32_mem(msgh_init, msg+76, 4);
-#endif
-		if (sin_scaled(msgh) == 2)
-#else
-		if (1)
-#endif
-		{
-			rfv2_hash(out, msg, sizeof(msg), rambox, NULL);
+		msgh = rf_crc32_mem(msgh_init, msg + 76, 4);
+		if (sin_scaled(msgh) != 2)
+			continue;
+
+		rfv2_init(&ctx, RFV2_INIT_CRC, rambox);
+		ctx.changes = 65535; // mark the rambox read-only
+
+		ctx.rb_o = msgh % (ctx.rb_l / 2);
+		ctx.rb_l = (ctx.rb_l / 2 - ctx.rb_o) * 2;
+
+		/* first loop */
+		rfv2_update(&ctx, msg, 80);
+		rfv2_pad128(&ctx);
+
+		/* second loop */
+		rfv2_update(&ctx, msg, 80);
+		rfv2_pad128(&ctx);
+
+		/* final */
+		rfv2_final(NULL, &ctx);
+
 #if MAXTHREADS > 1
-			__sync_fetch_and_add(&hashes, 1);
+		__sync_fetch_and_add(&hashes, 1);
 #else
-			hashes++;
+		hashes++;
 #endif
-		}
-		loops++;
 	}
 	return NULL;
 }
