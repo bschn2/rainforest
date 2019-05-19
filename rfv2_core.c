@@ -664,15 +664,15 @@ static inline void rfv2_update(rfv2_ctx_t *ctx, const void *msg, size_t len)
 	}
 }
 
-// pad to the next 256-bit (32 bytes) boundary
-static inline void rfv2_pad256(rfv2_ctx_t *ctx)
+// pad to the next 128-bit (16 bytes) boundary
+static inline void rfv2_pad128(rfv2_ctx_t *ctx)
 {
-	const uint8_t pad256[32] = { 0, };
+	const uint8_t pad128[16] = { 0, };
 	uint32_t pad;
 
-	pad = (32 - ctx->len) & 0xF;
+	pad = (16 - ctx->len) & 0xF;
 	if (pad)
-		rfv2_update(ctx, pad256, pad);
+		rfv2_update(ctx, pad128, pad);
 }
 
 // finalize the hash and copy the result into _out_ if not null (256 bits)
@@ -749,7 +749,7 @@ int rfv2_hash2(void *out, const void *in, size_t len, void *rambox, const void *
 	for (loop = 0; loop < loops; loop++) {
 		rfv2_update(&ctx, in, len);
 		// pad to the next 256 bit boundary
-		rfv2_pad256(&ctx);
+		rfv2_pad128(&ctx);
 	}
 
 	rfv2_final(out, &ctx);
@@ -815,11 +815,11 @@ int rfv2_scan_hdr(char *msg, void *rambox, uint32_t *hash, uint32_t target, uint
 
 		/* first loop */
 		rfv2_update(&ctx, msg, 80);
-		rfv2_pad256(&ctx);
+		rfv2_pad128(&ctx);
 
 		/* second loop */
 		rfv2_update(&ctx, msg, 80);
-		rfv2_pad256(&ctx);
+		rfv2_pad128(&ctx);
 
 		/* final */
 		rfv2_final(hash, &ctx);
