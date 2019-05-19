@@ -76,9 +76,6 @@ int scanhash_rfv2(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *h
 		if (!ret)
 			break;
 
-		// drop invalid shares caused by rambox collisions
-		rfv2_hash(hash, (char *)endiandata, 80, rambox, NULL);
-
 		if (rf_le32toh((uint8_t*)(hash+7)) <= Htarg && fulltest(hash, ptarget)) {
 			work_set_target_ratio(work, hash);
 			pdata[19] = nonce;

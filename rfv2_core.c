@@ -824,8 +824,15 @@ int rfv2_scan_hdr(char *msg, void *rambox, uint32_t *hash, uint32_t target, uint
 		/* final */
 		rfv2_final(hash, &ctx);
 
-		if (rf_le32toh((uint8_t *)(hash + 7)) <= target)
-			return 1;
+		if (__builtin_expect(rf_le32toh((uint8_t *)(hash + 7)) <= target, 0)) {
+			/* make sure it's a valid hash as the read-only rambox
+			 * occasionally causes invalid ones : just recompute it
+			 * entirely.
+			 */
+			rfv2_hash2(hash, msg, 80, rambox, NULL, RFV2_INIT_CRC);
+			if (rf_le32toh((uint8_t *)(hash+7)) <= target)
+				return 1;
+		}
 	next:
 		if (nonce == max)
 			return 0;
