@@ -781,8 +781,10 @@ int rfv2_hash(void *out, const void *in, size_t len, void *rambox, const void *r
 /* scans nonces from <min> to <max> applying them to message <msg> and stopping
  * once a hash gives a result at least as good as <target>. It uses <rambox>,
  * which must have been pre-initialized, and leaves the resulting hash in
- * <hash> which must contain at least 32 bytes and be 32-bit aligned. It
- * returns zero if no solution is found, otherwise 1. It only works with 32-bit
+ * <hash> which must contain at least 32 bytes and be 32-bit aligned. On
+ * success it returns the number of hashes attempted, or returns the opposite
+ * of this number if no solution is found. This will not overflow since we only
+ * cover few hashes. It only works with 32-bit
  * aligned 80-byte block headers in big endian format and places the nonce in
  * big endian format at the end of the message to hash it. In case of success,
  * the caller has to extract the nonce from the message. It also stops if
@@ -791,12 +793,13 @@ int rfv2_hash(void *out, const void *in, size_t len, void *rambox, const void *r
  */
 int rfv2_scan_hdr(char *msg, void *rambox, uint32_t *hash, uint32_t target, uint32_t min, uint32_t max, volatile char *stop)
 {
-	uint32_t msgh, msgh_init, nonce;
+	uint32_t msgh, msgh_init, nonce, hashes;
 	rfv2_ctx_t ctx;
 
 	// pre-compute the hash state based on the constant part of the header
 	msgh_init = rf_crc32_mem(0, msg, 76);
 
+	hashes = 0;
 	for (nonce = min;; nonce++) {
 		msg[76] = nonce >> 24;
 		msg[77] = nonce >> 16;
@@ -823,6 +826,7 @@ int rfv2_scan_hdr(char *msg, void *rambox, uint32_t *hash, uint32_t target, uint
 
 		/* final */
 		rfv2_final(hash, &ctx);
+		hashes++;
 
 		if (__builtin_expect(rf_le32toh((uint8_t *)(hash + 7)) <= target, 0)) {
 			/* make sure it's a valid hash as the read-only rambox
@@ -831,13 +835,13 @@ int rfv2_scan_hdr(char *msg, void *rambox, uint32_t *hash, uint32_t target, uint
 			 */
 			rfv2_hash2(hash, msg, 80, rambox, NULL, RFV2_INIT_CRC);
 			if (rf_le32toh((uint8_t *)(hash+7)) <= target)
-				return 1;
+				return hashes;
 		}
 	next:
 		if (nonce == max)
-			return 0;
+			return -hashes;
 
 		if (stop && *stop)
-			return 0;
+			return -hashes;
 	}
 }
