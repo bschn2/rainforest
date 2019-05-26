@@ -931,7 +931,7 @@ index 914ea77..0000000
 -	return 0;
 -}
 diff --git a/cpu-miner.c b/cpu-miner.c
-index 018d5ec..9c380a9 100644
+index 018d5ec..711565a 100644
 --- a/cpu-miner.c
 +++ b/cpu-miner.c
 @@ -112,7 +112,7 @@ enum algos {
@@ -961,7 +961,17 @@ index 018d5ec..9c380a9 100644
                            scrypt       scrypt(1024, 1, 1) (default)\n\
                            scrypt:N     scrypt(N, 1, 1)\n\
                            scrypt-jane:N (with N factor from 4 to 30)\n\
-@@ -2361,8 +2361,8 @@ static void *miner_thread(void *userdata)
+@@ -2167,6 +2167,9 @@ static void *miner_thread(void *userdata)
+ 
+ 		max64 *= (int64_t) thr_hashrates[thr_id];
+ 
++		if (opt_algo == ALGO_RFV2)
++			max64 *= 256; // optimized scan skips 255/256 nonces
++
+ 		if (max64 <= 0) {
+ 			switch (opt_algo) {
+ 			case ALGO_SCRYPT:
+@@ -2361,8 +2364,8 @@ static void *miner_thread(void *userdata)
  		case ALGO_QUBIT:
  			rc = scanhash_qubit(thr_id, &work, max_nonce, &hashes_done);
  			break;
@@ -973,7 +983,7 @@ index 018d5ec..9c380a9 100644
  		case ALGO_SCRYPT:
  			rc = scanhash_scrypt(thr_id, &work, max_nonce, &hashes_done, scratchbuf, opt_scrypt_n);
 diff --git a/cpuminer.vcxproj b/cpuminer.vcxproj
-index a881b2a..e58373b 100644
+index a881b2a..afa3b8d 100644
 --- a/cpuminer.vcxproj
 +++ b/cpuminer.vcxproj
 @@ -236,7 +236,7 @@ ﻿<?xml version="1.0" encoding="utf-8"?>
@@ -986,7 +996,7 @@ index a881b2a..e58373b 100644
      <ClCompile Include="algo\sha2.c" />
      <ClCompile Include="algo\sia.c" />
 diff --git a/cpuminer.vcxproj.filters b/cpuminer.vcxproj.filters
-index 43ec141..cf28fd5 100644
+index 43ec141..d046388 100644
 --- a/cpuminer.vcxproj.filters
 +++ b/cpuminer.vcxproj.filters
 @@ -270,7 +270,7 @@ ﻿<?xml version="1.0" encoding="utf-8"?>

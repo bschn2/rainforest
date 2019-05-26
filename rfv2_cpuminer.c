@@ -73,23 +73,23 @@ int scanhash_rfv2(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *h
 	do {
 		ret = rfv2_scan_hdr((char *)endiandata, rambox, hash, Htarg, nonce, max_nonce, restart);
 		nonce = be32toh(endiandata[19]);
-		if (!ret)
+		if (ret <= 0)
 			break;
 
-		// drop invalid shares caused by rambox collisions
-		rfv2_hash(hash, (char *)endiandata, 80, rambox, NULL);
-
-		if (rf_le32toh((uint8_t*)(hash+7)) <= Htarg && fulltest(hash, ptarget)) {
+		if (fulltest(hash, ptarget)) {
 			work_set_target_ratio(work, hash);
 			pdata[19] = nonce;
-			*hashes_done = pdata[19] - first_nonce;
+			*hashes_done = ret;
+			ret = 1;
 			goto out;
 		}
 		nonce++;
 	} while (nonce < max_nonce && !(*restart));
 
+	/* not found */
 	pdata[19] = nonce;
-	*hashes_done = pdata[19] - first_nonce + 1;
+	*hashes_done = -ret;
+	ret = 0;
 out:
 	return ret;
 }
